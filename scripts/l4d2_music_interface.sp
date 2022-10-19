@@ -12,11 +12,12 @@
 #include <sourcemod>
 #include <sdktools>
 #include <json>
+#include <left4dhooks>
 
 #pragma semicolon 1
 
 
-public Plugin:myinfo =
+public Plugin myinfo =
 {
 	name = PLUGIN_NAME,
 	author = PLUGIN_AUTHOR,
@@ -27,5 +28,23 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
-
+    HookEvent("round_start", RoundStart);
 }
+
+public Action RoundStart(Event event, const char[] name, bool dontBroadcast)
+{
+    CreateTimer(1.0, CheckMusicPlay, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action CheckMusicPlay(Handle:timer)
+{
+    
+}
+
+public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
+{
+    
+}
+
+
+
