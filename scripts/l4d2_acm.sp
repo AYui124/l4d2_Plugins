@@ -28,7 +28,7 @@ public Plugin myinfo =
 {
 	name = "ChangeMap",
 	author = PLUGIN_AUTHOR,
-	description = "Auto Change Map on final Level（use left4dhooks）",
+	description = "Auto Change Map on final Level (use left4dhooks)",
 	version = PLUGIN_VERSION,
 	url = "N/A"
 };
@@ -63,7 +63,7 @@ public Action:Cmd_MapVote(client, args)
 		PrintToChat(client, "当前已有投票进行中！");
 		return Plugin_Handled;
     }
-    ShowMainMenu(client);
+	ShowMainMenu(client);
 	return Plugin_Handled;
 }
 
@@ -74,7 +74,7 @@ public ShowMainMenu(client)
 	AddMenuItem(menu, "1", "官图");
 	AddMenuItem(menu, "2", "三方图");
 	AddMenuItem(menu, "3", "炸服");
-    SetMenuExitButton(menu, true);
+	SetMenuExitButton(menu, true);
 	DisplayMenu(menu, client, MENU_TIME_FOREVER);
 }
 
@@ -107,7 +107,7 @@ public MapTypeMenuHandler(Handle:menu, MenuAction:action, client, param)
 		}
 	}
 	
-    new Handle:fileHandle = OpenFile(filePath, "r");
+	new Handle:fileHandle = OpenFile(filePath, "r");
 	decl String:strData[10000];
 	if(fileHandle != INVALID_HANDLE)
 	{
@@ -115,7 +115,7 @@ public MapTypeMenuHandler(Handle:menu, MenuAction:action, client, param)
 		CloseHandle(fileHandle);
 	}
 	menu = CreateMenu(MapMenuHandler);
-    SetMenuTitle(menu, "投票换图");
+	SetMenuTitle(menu, "投票换图");
 	
 	JSON_Array mapJson = view_as<JSON_Array>(json_decode(strData));
 	JSON_Object countObj = mapJson.GetObject(0);
@@ -125,8 +125,8 @@ public MapTypeMenuHandler(Handle:menu, MenuAction:action, client, param)
 		decl String:voteMap[256];
 		decl String:voteMapName[256];
 		JSON_Object contentObj = mapJson.GetObject(i);
-	    contentObj.GetString("map", voteMap, sizeof(voteMap));
-	    contentObj.GetString("name", voteMapName, sizeof(voteMapName));
+		contentObj.GetString("map", voteMap, sizeof(voteMap));
+		contentObj.GetString("name", voteMapName, sizeof(voteMapName));
 		AddMenuItem(menu, voteMap, voteMapName);
     }
 	SetMenuExitButton(menu, true);
@@ -138,7 +138,7 @@ public MapMenuHandler(Handle:menu, MenuAction:action, client, itemNum)
 	if (action == MenuAction_Select)
 	{
 		voteYes = 0;
-	    voteNo = 0;
+		voteNo = 0;
 		new String:info[32] , String:name[32];
 		GetMenuItem(menu, itemNum, info, sizeof(info), _, name, sizeof(name));
 		votesMap = info;
@@ -195,7 +195,7 @@ public RestartVoteHandler(Handle:menu, MenuAction:action, client, param2)
 		{
 			PrintToChatAll("\x04%d人 \x03同意\x04%d人 \x03反对,\x05投票通过!", voteYes, voteNo);
 			PrintToChatAll("\x035秒后重启");
-	        CreateTimer(5.0, RestartServer);
+			CreateTimer(5.0, RestartServer);
 		}
 		else
 		{
@@ -261,7 +261,7 @@ public MapVoteHandler(Handle:menu, MenuAction:action, client, param2)
 			nextMap = votesMap;
 			nextName = votesMapName;
 			PrintToChatAll("\x035秒后换图: \x04%s", nextName);
-	        CreateTimer(5.0, ChangeMap);
+			CreateTimer(5.0, ChangeMap);
 		}
 		else
 		{
@@ -302,16 +302,12 @@ public Action:Cmd_ChangeCustomMapState(client, args)
 public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 {
 	LogMessage("LeftSafeArea:%N", client);
-    if(L4D_IsMissionFinalMap())
+	if(L4D_IsMissionFinalMap() && !called)
     {
-    	if(called)
-		{
-			return;
-		}
 		called = true;
-    	nextMap = "";
-	    nextName = "";
-    	CreateTimer(1.0, RandomMap);
+		nextMap = "";
+		nextName = "";
+		CreateTimer(1.0, RandomMap);
     }
 }
 
@@ -384,7 +380,7 @@ ReadMap()
 	{
 	    BuildPath(Path_SM, filePath, sizeof(filePath), "data/maplist_official.json");
     }
-    else
+	else
     {
         BuildPath(Path_SM, filePath, sizeof(filePath), "data/maplist_third.json");
     }

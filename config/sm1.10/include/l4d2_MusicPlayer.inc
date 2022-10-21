@@ -3,6 +3,8 @@
 #endif
 #define _l4d2_MusicPlayer_included
 
+#include <json>
+
 public SharedPlugin __pl_l4d2_changelevel = 
 {
 	name = "l4d2_MusicPlayer",
@@ -19,19 +21,19 @@ public void __pl_l4d2_MusicPlayer_SetNTVOptional()
 {
 	MarkNativeAsOptional("L4d2_StartMusic");
 	MarkNativeAsOptional("L4d2_StopMusic");
+	MarkNativeAsOptional("L4d2_GetMusicList");
 }
 #endif
 
 
 /**
-* @brief Start Playing Music
+* @brief Start Playing Music For All
 *
-* @param	client		    client who can listen
 * @param	url			    music url
-* @param	time			music time
+* @param	time			music during time, after this time will auto stop
 *
 */
-native void L4d2_StartMusic(int client, const char[] url, float time);
+native void L4d2_StartMusic(const char[] url, float time);
 
 /**
 * @brief Stop Playing Music
@@ -40,3 +42,10 @@ native void L4d2_StartMusic(int client, const char[] url, float time);
 *
 */
 native void L4d2_StopMusic(int client);
+
+/**
+* @brief Get List
+*
+*
+*/
+native any L4d2_GetMusicList();

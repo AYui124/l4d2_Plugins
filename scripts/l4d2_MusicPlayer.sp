@@ -17,6 +17,7 @@
 #pragma newdecls required
 
 Handle _musicStopTimer;
+bool _musicWorking;
 
 
 public Plugin myinfo =
@@ -49,42 +50,71 @@ public void OnPluginStart()
 
 public Action RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-    if (_musicStopTimer != INVALID_HANDLE)
-	{
-		KillTimer(_musicStopTimer);
-	}
+	Reset();
+	ClearTimer();
 }
+    
 
 any Native_L4d2_StartMusic(Handle plugin, int numParams)
 {
 	LogMessage("Call Start Music!");
-	int client = view_as<int>(GetNativeCell(1));
 	int urlLength;
-	GetNativeStringLength(2, urlLength);
+	GetNativeStringLength(1, urlLength);
 	char[] url = new char[urlLength + 1];
-	GetNativeString(2, url, urlLength + 1);
+	GetNativeString(1, url, urlLength + 1);
 
-	float time = view_as<float>(GetNativeCell(3));
+	float time = view_as<float>(GetNativeCell(2));
 
-	StartMusic(client, url, time);
+	StartMusic(url, time);
 }
 
-void StartMusic(int client, char[] url, float time)
+void StartMusic(char[] url, float time)
 {
-    motd(client, url);
-    CreateTimer(time, StopMusic, client, TIMER_FLAG_NO_MAPCHANGE);
+	if (_musicWorking)
+	{
+		LogMessage("Already Started Music!");
+		return;
+	}
+	for(int i = 1; i <= MaxClients; i++) 
+	{
+		if (IsValidSurvivor(i, false))
+		{
+             motd(i, url);
+		}
+	}
+	_musicWorking = true;
+	ClearTimer();
+	_musicStopTimer = CreateTimer(time, TimerStopMusic, 0, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-Action StopMusic(Handle timer, int client)
+Action TimerStopMusic(Handle timer, int client)
+{   
+	if (StopMusic(client))
+	{
+		return;
+	}
+	for(int i = 1; i <= MaxClients; i++) 
+	{
+		StopMusic(i);
+	}
+	_musicWorking = false;
+}
+
+bool StopMusic(int client)
 {
-	motd(client, "about:blank");
+	if (IsValidSurvivor(client, false))
+	{
+		motd(client, "about:blank");
+		return true;
+	}
+	return false;
 }
 
 any Native_L4d2_StopMusic(Handle plugin, int numParams)
 {
     LogMessage("Call Stop Music!");
     int client = view_as<int>(GetNativeCell(1));
-    CreateTimer(0.1, StopMusic, client, TIMER_FLAG_NO_MAPCHANGE);
+    StopMusic(client);
 }
 
 void motd(int client, char[] url)
@@ -94,6 +124,41 @@ void motd(int client, char[] url)
 	KvSetString(panel, "msg", url);
 	ShowVGUIPanel(client, "info", panel, false);
 	delete panel;
+}
+
+bool IsValidSurvivor(int client, bool allowbots)
+{
+	if ((client < 1) || (client > MaxClients))
+	{
+		return false;
+	}
+	if (!IsClientInGame(client) || !IsClientConnected(client))
+	{
+		return false;
+	}
+	if (GetClientTeam(client) != 2)
+	{
+		return false;
+	}
+	if (IsFakeClient(client) && !allowbots)
+	{
+		return false;
+	}
+	return true;
+}
+
+void ClearTimer()
+{
+    if (_musicStopTimer != INVALID_HANDLE)
+	{
+		KillTimer(_musicStopTimer);
+		_musicStopTimer = INVALID_HANDLE;
+	}
+}
+
+void Reset()
+{
+	_musicWorking = false;
 }
 
 
