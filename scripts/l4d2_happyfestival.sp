@@ -58,11 +58,11 @@ public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 		} 
 		else if (IsWeekend == 1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03,开呱!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,开呱!", client, Rate);
 		}
 		else if (IsWeekend == -1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03,就你小子举报大家开呱是吧!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,就你小子举报大家开呱是吧!", client, Rate);
 		}
 		else
 		{
@@ -251,7 +251,11 @@ InitData(any:client)
 	FormatTime(date, sizeof(date), "%m-%d");
 	decl String:week[20];
 	FormatTime(week, sizeof(week), "%A");
-	LogMessage("date:%s,week:%s", date,week);
+	decl String:hour[4];
+	FormatTime(hour, sizeof(hour), "%H");
+	decl String:minute[4];
+	FormatTime(minute, sizeof(minute), "%M");
+	LogMessage("date:%s,week:%s,time:%s:%s", date, week, hour, minute);
 	
 	new String:filePath[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, filePath, sizeof(filePath), "data/festival.txt");
@@ -269,10 +273,11 @@ InitData(any:client)
 		IsFestival = true;
 		return;
 	}
-	Rate = GetRandomInt(0, 1994 * client) % 100 + 1;
+	new multiRate = GetRandomInt(100, 2000);
+	Rate = GetRandomInt(0, multiRate * client) % 100 + 1;
 	LogMessage("rate=%d",Rate);
 	
-	if(StrEqual(week,"Saturday") || StrEqual(week,"Sunday"))
+	if(StrEqual(week,"Saturday") || StrEqual(week,"Sunday") || StrEqual(week,"Friday") && IsAtNight(hour, minute))
 	{
 		LogMessage("weekend=true");
 		
@@ -286,6 +291,13 @@ InitData(any:client)
 		}
 	}
 	
+}
+
+bool:IsAtNight(char[] hour, char[] minute)
+{
+	new h = StringToInt(hour);
+	new m = StringToInt(minute);
+	return h * 60 + m > 18 * 60;
 }
 
 bool:IsEnabled()
