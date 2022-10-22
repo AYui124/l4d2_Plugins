@@ -4,7 +4,7 @@
 #define PLUGIN_NAME           "l4d2_happyFestival"
 #define PLUGIN_AUTHOR         "mYui"
 #define PLUGIN_DESCRIPTION    "Gives Infinite Ammo when festival"
-#define PLUGIN_VERSION        "1.0"
+#define PLUGIN_VERSION        "1.3"
 #define PLUGIN_URL            "NA"
 
 #define MaxClients 32
@@ -222,21 +222,30 @@ public Action:Event_WeaponDrop(Handle:event, const String:name[], bool:dontBroad
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
-			if (Throwing[client] == 1)
+		    int needChange = 0;
+		    if (Throwing[client] == 1)
 			{
 				if (StrEqual(weapon, "pipe_bomb"))
 				{
+					needChange = 1;
 					CheatCommand(client, "give", "pipe_bomb");
 				}
 				else if (StrEqual(weapon, "vomitjar"))
 				{
+					needChange = 1;
 					CheatCommand(client, "give", "vomitjar");
 				}
 				else if (StrEqual(weapon, "molotov"))
 				{
+					needChange = 1;
 					CheatCommand(client, "give", "molotov");
 				}
 				Throwing[client] = 0;
+			}
+		    if (needChange == 1)
+			{
+				new weaponEnt = GetPlayerWeaponSlot(client, 2);
+				SetEntPropEnt(client, Prop_Send, "m_hActiveWeapon", weaponEnt);
 			}
 		}
 	}
