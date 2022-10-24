@@ -62,11 +62,11 @@ public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 		}
 		else if (IsWeekend == -1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,就你小子举报大家开呱是吧!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,我的呱呢!", client, Rate);
 		}
 		else
 		{
-			PrintToChatAll("\x05你不准参加银趴!");
+			PrintToChatAll("\x05银趴结束了!");
 		}
 		CreateTimer(60.0, ReSet, _, TIMER_FLAG_NO_MAPCHANGE);
 		Inited = 1;
