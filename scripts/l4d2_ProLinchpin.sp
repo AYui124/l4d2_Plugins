@@ -481,7 +481,7 @@ public Action:TimerCountDown(Handle:timer)
 			LogMessage("l4d_is_spawn_enabled missed");
 	    }
 	    
-	    new Handle:voteEnabled = FindConVar("rcm_VoteEnabled");
+		new Handle:voteEnabled = FindConVar("rcm_VoteEnabled");
 		if (voteEnabled != INVALID_HANDLE)
 		{
 			SetConVarInt(voteEnabled, 0);

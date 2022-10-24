@@ -254,7 +254,7 @@ public Action:SpawnInfectedAuto(Handle:timer)
 	{
 		//LogMessage("Wait 5 sec: Not Enabled");
 		StartCustomSpawnTimer(5.0);
-		return Plugin_Handled;
+		return Plugin_Continue;
 	}
 	if (leftSafeRoom) //only spawn infected and repeat spawn timer when survivors have left safe room
 	{
@@ -284,7 +284,7 @@ public Action:SpawnInfectedAuto(Handle:timer)
 			RandomMusic();
 		}
 	}
-	return Plugin_Handled;
+	return Plugin_Continue;
 }
 
 GenerateSpawn(client)
@@ -662,89 +662,6 @@ public Action:KickBot(Handle:timer, any:client)
 		}
 	}
 }
-
-
-/*
-public Action:LeaveStasis(Handle:timer, any:client)
-{
-	if (!IsClientInGame(client) || !IsFakeClient(client))
-	{
-		return;
-	}
-	LogMessage("LeaveStasis");
-	ChangeTank(client,false);
-	new Float:srcPos[3];
-	GetClientAbsOrigin(client, srcPos);
-	TeleportToSurvivor(client);
-	
-	decl Handle:dataPack;
-	dataPack = CreateDataPack();
-	WritePackCell(dataPack, srcPos[0]);
-	WritePackCell(dataPack, srcPos[1]);
-	WritePackCell(dataPack, srcPos[2]);
-	WritePackCell(dataPack, client);
-	
-	CreateTimer(1.0, TeleportBack, dataPack);
-}
-
-ChangeTank(client,bool:visible)
-{
-	LogMessage("ChangeTank");
-	SetEntityRenderMode(client, RenderMode:3); 
-	SetEntityRenderColor(client, 255, 255, 255, visible ? 255:0);
-}
-
-TeleportToSurvivor(client)
-{
-	LogMessage("TeleportToSurvivor");
-	new survivor = GetRandomSurvivor();
-	new Float:pos[3];
-	new Float:angles[3];
-	new Float:endPos[3];
-	GetClientEyePosition(survivor, pos);
-	GetClientEyeAngles(survivor, angles);
-	new Handle: trace= TR_TraceRayFilterEx(pos, angles, MASK_SHOT, RayType_Infinite, DontHitSelfAndPlayer, client);
-	if(TR_DidHit(trace))
-	{		
-		TR_GetEndPosition(endPos, trace);
-	}
-	CloseHandle(trace);
-	TeleportEntity(client, endPos, NULL_VECTOR, NULL_VECTOR);
-}
-
-public bool:DontHitSelfAndPlayer(entity, mask, any:data)
-{
-	if(entity == data) 
-	{
-		return false; 
-	}
-	else if(entity > 0 && entity <= MaxClients)
-	{
-		if(IsClientInGame(entity) && (GetClientTeam(entity) == 2 || GetClientTeam(entity) == 3))
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-public Action:TeleportBack(Handle:timer,Handle:data)
-{
-	LogMessage("TeleportToSurvivor");
-	decl Float:srcPos[3];
-	decl client;
-	ResetPack(data, false);
-	srcPos[0] = ReadPackCell(data);
-	srcPos[1] = ReadPackCell(data);
-	srcPos[2] = ReadPackCell(data);
-	client = ReadPackCell(data);
-	CloseHandle(data);
-	
-	ChangeTank(client, true);
-	
-	TeleportEntity(client, srcPos, NULL_VECTOR, NULL_VECTOR);
-}
-*/
 
 
 
