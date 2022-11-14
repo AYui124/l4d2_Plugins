@@ -4,14 +4,17 @@
 #include <sdktools>
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "1.2"
+#define PLUGIN_VERSION "1.3"
 #define Primary 17
 #define Secend 21
 #define Special 13
 #define Throwable 24
 #define Medkit 13
 #define Upgrade 12
+#define EntityCount 10000
 
+new markedEntity[EntityCount];
+new timerWorking;
 static MODEL_DEFIB;
 
 static String:gun_Scripts[15][] =
@@ -99,10 +102,9 @@ public OnPluginStart()
 	if(!flag)SetFailState("Use this in Left4Dead2 only!");
 	HookEvent("round_start", Event_RoundStart);
 	HookEvent("player_death", Event_PlayerDeath);
-	
-	//RegConsoleCmd("sm_roll", Cmd_Roll);
+	HookEvent("round_end", Event_RoundEnd);
 	Precache();
-	CreateTimer(1.0, InitHiddenWeaponsDelayed);
+	CreateTimer(0.1, InitHiddenWeaponsDelayed);
 }
 
 bool:GameCheck()
@@ -116,18 +118,62 @@ bool:GameCheck()
 	return false;
 }
 
-public Action:Cmd_Roll(client, args)
-{
-	//PreRoll(client, 50);
-}
-
 public OnMapStart()
 {
 	MODEL_DEFIB = PrecacheModel("models/w_models/weapons/w_eq_defibrillator.mdl", true);
+	CreateTimer(30.0, RemoveWeapon, _,  TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 }
 
 public Action:Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	timerWorking = 0;
+}
+
+public Action:Event_RoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	timerWorking = 0;
+}
+
+public Action: RemoveWeapon(Handle: timer)
+{
+	if (timerWorking != 1) 
+	{
+		return Plugin_Continue;
+	}
+	for (new i = 0; i <= 10000; i++)
+	{
+		if(IsValidEntity(i))
+		{
+			decl String:className[64];
+			GetEntityClassname(i, className, sizeof(className));
+			if (StrContains(className, "weapon", false) >= 0 
+			    && (StrContains(className, "spawn", false) == -1 
+				|| StrContains(className, "gascan", false) == -1
+				|| StrContains(className, "oxygentank", false) == -1
+				|| StrContains(className, "propanetank", false) == -1))
+			{
+				if (!HasEntProp(i, Prop_Data, "m_iState"))
+				{
+					continue;
+				}
+				new weaponState = GetEntProp(i, Prop_Data, "m_iState", 4, 0);
+				if (weaponState == 0)
+				{
+					if(markedEntity[i] > 0)
+					{
+						AcceptEntityInput(i, "Kill");
+						markedEntity[i] = 0;
+					}
+					else
+					{
+						markedEntity[i] = i;
+					}
+					
+				}
+			}
+		}
+	}
+	return Plugin_Continue;
 }
 
 public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
@@ -142,15 +188,16 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 			buf[0] = '\0';
 			GetEventString(event, "victimname", buf, sizeof(buf));
 			if (buf[0] == 'B' || buf[0] == 'J' || (buf[0] == 'S' &&(buf[1] == 'm' || buf[1] == 'p')) || buf[0] == 'H' || buf[0] == 'C')
-			{
+			{   
 				PreRoll(vic, 1);
 			}
 			if (buf[0] == 'T')
 			{
 				PreRoll(vic, 3);
 			}
+			timerWorking = true;
 		}
-	}	
+	}
 }
 
 PreRoll(any:client, any:data)
@@ -254,7 +301,7 @@ C_PrimWeapon()
 	{
 		ammo = 0;
 	}
-	weapon = CreateEneity(gun_Scripts[model]);
+	weapon = CreateEntity(gun_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",gun_Scripts[model]);
@@ -268,7 +315,7 @@ C_PrimWeapon()
 C_Melee()
 {
 	new weapon = -1;
-	weapon = CreateEneity("weapon_melee");
+	weapon = CreateEntity("weapon_melee");
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity 'weapon_melee'.");
@@ -303,7 +350,7 @@ C_SpWeapon()
 	{
 		ammo = 0;
 	}
-	weapon = CreateEneity(spweapon_Scripts[model]);
+	weapon = CreateEntity(spweapon_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",spweapon_Scripts[model]);
@@ -321,7 +368,7 @@ C_Generade()
 {
 	new weapon = -1;
 	new model = GetRandomInt(0, 2);
-	weapon = CreateEneity(generade_Scripts[model]);
+	weapon = CreateEntity(generade_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",generade_Scripts[model]);
@@ -335,7 +382,7 @@ C_Medkit()
 {
 	new weapon = -1;
 	new model = GetRandomInt(0, 3);
-	weapon = CreateEneity(medkit_Scripts[model]);
+	weapon = CreateEntity(medkit_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",medkit_Scripts[model]);
@@ -353,7 +400,7 @@ C_UpGAndCan()
 {
 	new weapon = -1;
 	new model = GetRandomInt(0, 5);
-	weapon = CreateEneity(upgcan_Scripts[model]);
+	weapon = CreateEntity(upgcan_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",upgcan_Scripts[model]);
@@ -363,37 +410,10 @@ C_UpGAndCan()
 	return weapon;
 }
 
-CreateEneity(const String:name[])
+CreateEntity(const String:name[])
 {
-	new count = GetEntityCount();
-	if(count > 3000)
-	{
-		LogMessage("current entity count:%d", count);
-		LogMessage("Entity Count Arrived 3000, Start Remove Not_In_hand Weapon!!");
-		RemoveEntities();
-	}
 	new entity = CreateEntityByName(name);
 	return entity;
-}
-
-RemoveEntities()
-{
-	new String:className[64];
-	for (new i = 0; i <= 4096; i++)
-	{
-		if(IsValidEntity(i))
-		{
-			GetEntityClassname(i, className, sizeof(className));
-			if (StrContains(className, "weapon", false) >= 0 && StrContains(className, "spawn", false) == -1)
-			{
-				new weaponState = GetEntProp(i, Prop_Data, "m_iState", 4, 0);
-				if (weaponState == 0)
-				{
-					AcceptEntityInput(i, "Kill");
-				}
-			}
-		}
-	}
 }
 
 Precache()
@@ -575,10 +595,10 @@ public Action:InitHiddenWeaponsDelayed(Handle:timer, any:client)
 	PreCacheGun("weapon_sniper_scout");
 	PreCacheGun("weapon_rifle_m60");
 	
-	decl String:Map[56];
-	GetCurrentMap(Map, sizeof(Map));
-	LogMessage("Hidden weapon initialization.");
-	//ForceChangeLevel(Map, "Hidden weapon initialization.");			// plugin start change  map 已由其他插件实现
+	//decl String:Map[56];
+	//GetCurrentMap(Map, sizeof(Map));
+	//LogMessage("Hidden weapon initialization.");
+	//ForceChangeLevel(Map, "Hidden weapon initialization.");
 }
 
 static PreCacheGun(const String:GunEntity[])

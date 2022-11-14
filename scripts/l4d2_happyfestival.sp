@@ -8,10 +8,12 @@
 #define PLUGIN_URL            "NA"
 
 #define MaxClients 32
+#define MaxListCount 32
 
 #include <sourcemod>
 #include <sdktools>
 #include <left4dhooks>
+#include <smlib>
 
 #pragma semicolon 1
 
@@ -19,7 +21,10 @@ new Throwing[MaxClients+1];
 new Inited;
 new bool:IsFestival;
 new IsWeekend;
-new Rate;
+int Rate;
+new Float:FailedCount;
+new String:saveList[MaxListCount][32];
+new count;
 
 public Plugin:myinfo =
 {
@@ -45,6 +50,7 @@ public OnPluginStart()
 public OnMapStart()
 {
 	Inited = 0;
+	FailedCount = 0.0;
 }
 
 public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
@@ -54,15 +60,15 @@ public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 		InitData(client);
 		if (IsFestival)
 		{
-			PrintToChatAll("\x04开呱!!开呱!!");
+			PrintToChatAll("\x04开趴!!");
 		} 
 		else if (IsWeekend == 1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,开呱!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,我的呱呱!", client, Rate);
 		}
 		else if (IsWeekend == -1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,我的呱呢!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,你小子!", client, Rate);
 		}
 		else
 		{
@@ -84,6 +90,7 @@ public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadc
 {
 	IsFestival = false;
 	IsWeekend = 0;
+	ReadTxt();
 }
 
 public Action:Event_PlayerDisconnect(Handle:event, String:event_name[], bool:dontBroadcast)
@@ -96,7 +103,7 @@ public Action:Event_WeaponFire(Handle:event, const String:name[], bool:dontBroad
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	GetEventString(event, "weapon", weapon, sizeof(weapon));
 	
-	if (!IsEnabled())
+	if (!IsEnabled(client, true))
 	{
 		return Plugin_Handled;
 	}
@@ -218,7 +225,7 @@ public Action:Event_WeaponDrop(Handle:event, const String:name[], bool:dontBroad
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	GetEventString(event, "item", weapon, sizeof(weapon));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, true))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -267,7 +274,7 @@ InitData(any:client)
 	LogMessage("date:%s,week:%s,time:%s:%s", date, week, hour, minute);
 	
 	new String:filePath[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, filePath, sizeof(filePath), "data/festival.txt");
+	BuildPath(Path_SM, filePath, sizeof(filePath), "data/festival/date.txt");
 	new Handle:fileHandle = OpenFile(filePath, "r");
 	decl String:strData[10000];
 	if(fileHandle != INVALID_HANDLE)
@@ -286,39 +293,145 @@ InitData(any:client)
 	Rate = GetRandomInt(0, multiRate * client) % 100 + 1;
 	LogMessage("rate=%d",Rate);
 	
-	if(StrEqual(week,"Saturday") || StrEqual(week,"Sunday") || StrEqual(week,"Friday") && IsAtNight(hour, minute))
+	if(StrEqual(week,"Saturday") 
+		|| StrEqual(week,"Sunday") 
+		|| StrEqual(week,"Friday") && IsAfterEvening(hour, minute) 
+		|| StrEqual(week,"Monday") && IsBeforeMorning(hour, minute))
 	{
 		LogMessage("weekend=true");
-		
-		if (Rate > 50)
+		new Float:compareRate = FailedCount == 0 ? 50.0 : (50.0 / SquareRoot(FailedCount));
+		LogMessage("compareRate=%f", compareRate);
+		if (compareRate < 10.0)
+		{
+			compareRate = 10.0;
+		}
+		if (Rate > compareRate)
 		{
 			IsWeekend = 1;
+			FailedCount = 0.0;
 		}
 		else
 		{
 			IsWeekend = -1;
+			FailedCount = FailedCount + 1.0;
 		}
 	}
 	
 }
 
-bool:IsAtNight(char[] hour, char[] minute)
+bool:IsAfterEvening(char[] hour, char[] minute)
 {
 	new h = StringToInt(hour);
 	new m = StringToInt(minute);
 	return h * 60 + m > 18 * 60;
 }
 
-bool:IsEnabled()
+
+bool:IsBeforeMorning(char[] hour, char[] minute)
 {
-	return IsFestival || IsWeekend == 1;
+	new h = StringToInt(hour);
+	new m = StringToInt(minute);
+	return h * 60 + m < 3 * 60;
+}
+
+bool:IsEnabled(int client, bool:isWeapon)
+{
+	return (IsFestival || IsWeekend == 1) && (!isWeapon || IsAuthorizedSurvivor(client));
+	//return (!isWeapon || IsAuthorizedSurvivor(client));
+}
+
+bool:IsAuthorizedSurvivor(int client)
+{
+	if (!IsValidSurvivor(client, false))
+	{
+		return false;
+	}
+	decl String:buffer[32];
+	GetClientAuthId(client, AuthId_Steam2, buffer, 32, true);
+	new i = 0;
+	while (i < count)
+	{
+		if (strcmp(saveList[i], buffer, true) == 0)
+		{
+			return false;
+		}
+		i++;
+	}
+	return true;
+}
+
+bool:IsValidSurvivor(client, bool:allowbots)
+{
+	if ((client < 1) || (client > MaxClients))
+	{
+		return false;
+	}
+	if (!IsClientInGame(client) || !IsClientConnected(client))
+	{
+		return false;
+	}
+	if (GetClientTeam(client) != 2)
+	{
+		return false;
+	}
+	if (IsFakeClient(client) && !allowbots)
+	{
+		return false;
+	}
+	return true;
+}
+
+ReadTxt()
+{
+	new Handle:file = INVALID_HANDLE;
+	decl String:folderPath[256];
+	Format(folderPath, 256, "/addons/sourcemod/data/festival");
+	decl String:filePath[256];
+	Format(filePath, 256, "%s/%s.txt", folderPath, "banned");
+	if (!FileExists(filePath, false, "GAME"))
+	{
+		LogMessage("Error file '%s' not existed.", filePath);
+	}
+	if (file != INVALID_HANDLE)
+	{
+		CloseHandle(file);
+		file = INVALID_HANDLE;
+	}
+	file = OpenFile(filePath, "r", false, "GAME");
+	if (!file)
+	{
+		LogError("Error opening file via file '%s'.", filePath);
+	}
+
+	decl String:buffer[32];
+	count = 0;
+	while (!IsEndOfFile(file))
+	{
+		ReadFileLine(file, buffer, 32);
+		if(strlen(buffer)>10)
+		{
+			if (Array_FindString(saveList, MaxListCount, buffer, false, 0) < 0)
+			{
+				LogMessage("Id: %s", buffer);
+				Format(saveList[count], 32, buffer);
+				count++;
+			}
+		}
+	}
+	if (file != INVALID_HANDLE)
+	{
+		CloseHandle(file);
+		file = INVALID_HANDLE;
+	}
+	
+	return 0;
 }
 
 public Action:Event_HealSuccess(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, false))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -336,7 +449,7 @@ public Action:Event_DefibrillatorUsed(Handle:event, const String:name[], bool:do
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, false))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -354,7 +467,7 @@ public Action:Event_PillsUsed(Handle:event, const String:name[], bool:dontBroadc
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, false))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -362,6 +475,7 @@ public Action:Event_PillsUsed(Handle:event, const String:name[], bool:dontBroadc
 		}
 	}
 }
+
 public Action:TimerPills(Handle:timer, any:client)
 {
 	CheatCommand(client, "give", "pain_pills");
@@ -371,7 +485,7 @@ public Action:Event_AdrenalineUsed(Handle:event, const String:name[], bool:dontB
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, false))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{

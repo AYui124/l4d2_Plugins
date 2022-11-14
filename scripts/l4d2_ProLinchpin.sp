@@ -152,8 +152,8 @@ public OnPluginStart()
     	SetFailState("Game data missing!");
     }
 	
-	nextPrimaryAttackOffset = FindSendPropInfo("CBaseCombatWeapon","m_flNextPrimaryAttack");
-	activeWeaponOffset = FindSendPropInfo("CBasePlayer", "m_hActiveWeapon");
+	//nextPrimaryAttackOffset = FindSendPropInfo("CBaseCombatWeapon","m_flNextPrimaryAttack");
+	//activeWeaponOffset = FindSendPropInfo("CBasePlayer", "m_hActiveWeapon");
 	
 	new Handle:hMaxSurvivorsLimitCvar = FindConVar("survivor_limit");
 	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Lower, true, 1.0);
@@ -245,7 +245,7 @@ public OnMapStart()
 	PrecacheSound(COUNTDOWN_ED_SOUND,true);
 	PrecacheSound(INFO_NOTLCP_SOUND,true);
 	PrecacheSound(INFO_LCP_SOUND,true);
-	MODEL_DEFIB = PrecacheModel("models/w_models/weapons/w_eq_defibrillator.mdl", true);
+	PrecacheModel("models/w_models/weapons/w_eq_defibrillator.mdl", true);
 	CreateTimer(5.0, SQL_MapStartConnect, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -500,7 +500,12 @@ public Action:TimerCountDown(Handle:timer)
 		EmitSoundToAll(COUNTDOWN_ING_SOUND);
 		PrintHintTextToAll("请等待 %i 秒", ((isFirstRound ? 45:15) - countDown));
 		countDown += 1;
-		CreateTimer(1.0, TimerCountDown, _, TIMER_FLAG_NO_MAPCHANGE);
+		if (!isRoundEnd)
+		{
+			// 防止倒计时结束前团灭导致重复计时
+            CreateTimer(1.0, TimerCountDown, _, TIMER_FLAG_NO_MAPCHANGE);
+		}
+		
 	}
 	return Plugin_Continue;
 }
@@ -1175,64 +1180,64 @@ public OnGameFrame()
 	}
 }
 
-MeleeAttack_OnGameFrame()
-{
-	if (linchpin < 1)
-		return;
+// MeleeAttack_OnGameFrame()
+// {
+// 	if (linchpin < 1)
+// 		return;
 		
-	decl index;
-	decl meleeEntID;
-	decl Float:flNextTime_calc;
-	decl Float:flNextTime_ret;
-	new Float:flGameTime=GetGameTime();
-	index = linchpin;
-	if (index <= 0)
-		return;
-	if(!IsClientInGame(index))
-		return;
-	if(!IsClientConnected(index))
-		return;
-	if (!IsPlayerAlive(index))
-		return;
-	if(GetClientTeam(index) != 2)
-		return;
-	meleeEntID = GetEntDataEnt2(index,activeWeaponOffset);
-	if (meleeEntID == -1)
-		return;
-	flNextTime_ret = GetEntDataFloat(meleeEntID, nextPrimaryAttackOffset);
-	if (meleeEntID == meleeAttackNotMeleeEnt)
-	{
-		return;
-	}
-	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackCount != 0 && (flGameTime - flNextTime_ret) > 1.0)
-	{
-		meleeAttackCount = 0;
-	}
-	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackNextTimeFlame >= flNextTime_ret)
-	{
-		return;
-	}
-	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackNextTimeFlame < flNextTime_ret)
-	{
-		flNextTime_calc = flGameTime + 0.49;
-		meleeAttackNextTimeFlame  = flNextTime_calc;
-		SetEntDataFloat(meleeEntID, nextPrimaryAttackOffset, flNextTime_calc, true);
-		return;
-	}
-	decl String:stName[32];
-	GetEntityNetClass(meleeEntID,stName,32);
-	if (StrEqual(stName, "CTerrorMeleeWeapon", false) == true)
-	{
-		meleeAttackMeleeEnt = meleeEntID;
-		meleeAttackNextTimeFlame = flNextTime_ret;
-		return;
-	}
-	else
-	{
-		meleeAttackNotMeleeEnt = meleeEntID;
-		return;
-	}
-}
+// 	decl index;
+// 	decl meleeEntID;
+// 	decl Float:flNextTime_calc;
+// 	decl Float:flNextTime_ret;
+// 	new Float:flGameTime=GetGameTime();
+// 	index = linchpin;
+// 	if (index <= 0)
+// 		return;
+// 	if(!IsClientInGame(index))
+// 		return;
+// 	if(!IsClientConnected(index))
+// 		return;
+// 	if (!IsPlayerAlive(index))
+// 		return;
+// 	if(GetClientTeam(index) != 2)
+// 		return;
+// 	meleeEntID = GetEntDataEnt2(index,activeWeaponOffset);
+// 	if (meleeEntID == -1)
+// 		return;
+// 	flNextTime_ret = GetEntDataFloat(meleeEntID, nextPrimaryAttackOffset);
+// 	if (meleeEntID == meleeAttackNotMeleeEnt)
+// 	{
+// 		return;
+// 	}
+// 	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackCount != 0 && (flGameTime - flNextTime_ret) > 1.0)
+// 	{
+// 		meleeAttackCount = 0;
+// 	}
+// 	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackNextTimeFlame >= flNextTime_ret)
+// 	{
+// 		return;
+// 	}
+// 	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackNextTimeFlame < flNextTime_ret)
+// 	{
+// 		flNextTime_calc = flGameTime + 0.49;
+// 		meleeAttackNextTimeFlame  = flNextTime_calc;
+// 		SetEntDataFloat(meleeEntID, nextPrimaryAttackOffset, flNextTime_calc, true);
+// 		return;
+// 	}
+// 	decl String:stName[32];
+// 	GetEntityNetClass(meleeEntID,stName,32);
+// 	if (StrEqual(stName, "CTerrorMeleeWeapon", false) == true)
+// 	{
+// 		meleeAttackMeleeEnt = meleeEntID;
+// 		meleeAttackNextTimeFlame = flNextTime_ret;
+// 		return;
+// 	}
+// 	else
+// 	{
+// 		meleeAttackNotMeleeEnt = meleeEntID;
+// 		return;
+// 	}
+// }
 
 GlowWitch_OnGameFrame()
 {
@@ -1691,25 +1696,32 @@ public Action:SIOnTraceAttack(victim, &attacker, &inflictor, &Float:damage, &dam
 	}
 	if (StrEqual(cName, "weapon_melee", false))
 	{
-		//damage *= GetRandomFloat(0.1, 0.8);
-		//PrintHintText(attacker, "%d", damage);
-		//return Plugin_Changed;
-		
 		if (GetEntProp(victim, Prop_Send, "m_zombieClass") == 8)	// 是tank
 		{
-			damage = GetRandomFloat(0.1, 100.0);					// 修改伤害为0.1-100
+			if (attacker == linchpin) 
+			{
+                damage *= 2.0;										// 翻倍
+			}
+			else
+			{
+				damage = GetRandomFloat(0.1, 50.0);				// 修改伤害为0.1-50
+			}
 		}
 		else
 		{
-			damage *= GetRandomFloat(0.3, 0.7);
+			if (attacker == linchpin) 
+			{
+                //不调整
+			}
+			else
+			{
+				damage *= GetRandomFloat(0.1, 0.5);
+			}
 		}
-		//PrintHintText(attacker, "");
-		return Plugin_Changed;
 	}
 	else if (StrEqual(cName, "weapon_chainsaw", false))
 	{
-		damage *= GetRandomFloat(0.7, 1.0);
-		return Plugin_Changed;
+		damage *= GetRandomFloat(0.1, 1.0);
 	}
 	return Plugin_Changed;
 }
@@ -2571,9 +2583,12 @@ GiveItemFromSlotInfo()
 				if (weaponUpgrade[i] > 0)
 				{
 					new gun = GetPlayerWeaponSlot(client, 0);
-					new clipSize = GetEntProp(gun, Prop_Send, "m_iClip1", 4);
-					SetEntProp(gun, Prop_Send, "m_upgradeBitVec", weaponUpgrade[i], 4);
-					SetEntProp(gun, Prop_Send, "m_nUpgradedPrimaryAmmoLoaded", clipSize, 4);
+					if (gun > 0)
+					{
+						new clipSize = GetEntProp(gun, Prop_Send, "m_iClip1", 4);
+						SetEntProp(gun, Prop_Send, "m_upgradeBitVec", weaponUpgrade[i], 4);
+						SetEntProp(gun, Prop_Send, "m_nUpgradedPrimaryAmmoLoaded", clipSize, 4);
+					}
 				}
 			}
 			if (!StrEqual(slot2[i], "", false))

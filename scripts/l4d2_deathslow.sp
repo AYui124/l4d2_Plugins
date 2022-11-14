@@ -29,6 +29,7 @@ public OnPluginStart()
 	HookEvent("charger_carry_end", Event_CarryEnd);
 	HookEvent("player_spawn", Event_PlayerSpawn);
 	HookEvent("player_death", Event_PlayerDeath);
+	HookEvent("round_end", Event_RoundEnd);
 	g_bSteerEnabled = false;
 }
 
@@ -37,6 +38,19 @@ public OnMapStart()
 	PrefetchSound(sound);
 	PrecacheSound(sound);
 	h_Charge = INVALID_HANDLE;
+}
+
+Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
+{
+	new ent = FindEntityByClassname(-1, "func_timescale");
+	while(ent > -1)
+	{
+		if(IsValidEdict(ent))
+		{
+			AcceptEntityInput(ent, "Stop");
+		}
+		ent = FindEntityByClassname(ent, "func_timescale");
+	}
 }
 
 public Action:Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast)
@@ -117,7 +131,9 @@ public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:ang
 {
 	if(g_bSteerEnabled && (buttons & IN_MOVELEFT || buttons & IN_MOVERIGHT) && g_bIsCharging[client] && GetEntProp(client, Prop_Send, "m_fFlags") & FL_ONGROUND)
 	{
-		new Float:vVel[3], vVec[3], vAng[3];
+		new Float:vVel[3];
+		new Float:vVec[3];
+		new Float:vAng[3];
 		GetEntPropVector(client, Prop_Data, "m_vecVelocity", vVel);
 		GetClientEyeAngles(client, vAng);
 
