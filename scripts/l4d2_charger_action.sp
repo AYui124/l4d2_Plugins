@@ -172,7 +172,7 @@ public void OnPluginStart()
 	g_hCvarBots =	CreateConVar(		"l4d2_charger_bots",		"2",	"Bots can: 0=Grab survivor on contact (game default). 1=Fling survivors on contact instead of grab. 2=Random choice.", CVAR_FLAGS);
 	g_hCvarCharge =	CreateConVar(		"l4d2_charger_charge",		"1",	"Humans can: 0=Grab survivor on contact (game default). 1=Fling survivors on contact instead of grab.", CVAR_FLAGS);
 	g_hCvarDamage =	CreateConVar(		"l4d2_charger_damage",		"10",	"Amount of damage to deal on collision when hitting or grabbing a survivor.", CVAR_FLAGS);
-	g_hCvarFinish =	CreateConVar(		"l4d2_charger_finish",		"2",	"After carrying and charging: 0=Pummel (game default). 1=Drop survivor. 2=Drop when a carried survivor is incapped. 3=Both 1 and 2. 4=Continue to carry.", CVAR_FLAGS);
+	g_hCvarFinish =	CreateConVar(		"l4d2_charger_finish",		"0",	"After carrying and charging: 0=Pummel (game default). 1=Drop survivor. 2=Drop when a carried survivor is incapped. 3=Both 1 and 2. 4=Continue to carry.", CVAR_FLAGS);
 	g_hCvarJump =	CreateConVar(		"l4d2_charger_jump",		"2",	"Allow chargers to jump while charging. 0=Off. 1=When alone. 2=Also when carrying a survivor.", CVAR_FLAGS);
 	g_hCvarJumps =	CreateConVar(		"l4d2_charger_jumps",		"0",	"0=Unlimited. Maximum number of jumps per charge.", CVAR_FLAGS);
 	g_hCvarPickup =	CreateConVar(		"l4d2_charger_pickup",		"31",	"Allow chargers to carry and drop survivors with the melee button (RMB). 0=Off. 1=Grab Incapped. 2=Grab Standing. 4=Drop Incapped. 8=Drop Standing. 16=Grab while charging (requires l4d2_charger_punch cvar). Add numbers together.", CVAR_FLAGS);

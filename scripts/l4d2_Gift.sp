@@ -132,7 +132,7 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
 			}
 			if (buf[0] == 'T')
 			{
-				new random = GetRandomInt(2, 5);
+				new random = GetRandomInt(2, 4);
 				CreateGifts(vic, random);
 			}
 		}
@@ -147,66 +147,129 @@ CreateGifts(any:client, any:data)
 		Format(strData, sizeof(strData), "%d", data);
 		
 		decl Float:vPos[3];
-		GetClientAbsOrigin(client, vPos);
+		GetClientEyePosition(client, vPos);
+		vPos[2] += 10.0;
 		
-		new entity = CreateEntityByName("prop_dynamic_override");
+		new entity = CreateEntityByName("prop_physics_override");
 		if(entity == -1)
-			ThrowError("Failed to create prop_dynamic_override.");
+			return;
 			
-		DispatchKeyValue(entity, "solid", "6");
-		SetEntityModel(entity, GiftModel);
+		DispatchKeyValueVector(entity, "origin", vPos);
+		DispatchKeyValue(entity, "model", GiftModel);
+		DispatchKeyValue(entity, "spawnflags", "256");
 		SetEntPropString(entity, Prop_Data, "m_iName", strData);
-		TeleportEntity(entity, vPos, NULL_VECTOR, NULL_VECTOR);
 		DispatchSpawn(entity);
-		if(data == 1)
-		    AcceptEntityInput(entity, "DisableShadow");
+		SetEntPropFloat(entity, Prop_Send, "m_flModelScale", 0.8);
+		SetEntProp(entity, Prop_Send, "m_usSolidFlags", 8);
+		SetEntProp(entity, Prop_Send, "m_CollisionGroup", 11);
+		//SetEntityRenderColor(entity, 255, 88, 130, 255);
+		CreateTimer(0.1, ColdDown, EntIndexToEntRef(entity), TIMER_FLAG_NO_MAPCHANGE);
 		
-		SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage);
+	}
+}
+
+SetEntityGlow(entity)
+{
+	new color = GetRgbInt(206, 127, 50);
+
+	SetEntProp(entity, Prop_Send, "m_iGlowType", 3);
+	SetEntProp(entity, Prop_Send, "m_glowColorOverride", color);
+	SetEntProp(entity, Prop_Send, "m_nGlowRange", 2048);
+	SetEntProp(entity, Prop_Send, "m_bFlashing", 1);
+}
+
+RemoveEntityGlow(entity)
+{
+	SetEntProp(entity, Prop_Send, "m_iGlowType", 0);
+	SetEntProp(entity, Prop_Send, "m_glowColorOverride", 0);
+	SetEntProp(entity, Prop_Send, "m_nGlowRange", 0);
+	SetEntProp(entity, Prop_Send, "m_bFlashing", 0);
+}
+
+public Action:ColdDown(Handle:timer, any:ref)
+{
+	LogMessage("ColdDown ref=%d", ref);
+	int gift;
+	if (ref && (gift = EntRefToEntIndex(ref)) != INVALID_ENT_REFERENCE)
+	{
+		LogMessage("ColdDown gift=%d", gift);
+		SetEntityGlow(gift);
+		SDKHook(gift, SDKHook_Use, OnUse);
+		CreateTimer(30.0, RemoveGift, ref, TIMER_FLAG_NO_MAPCHANGE);
+	}
+
+	return Plugin_Continue;
+}
+
+public Action:RemoveGift(Handle:timer, any:ref)
+{
+	LogMessage("RemoveGift ref=%d", ref);
+	int gift;
+	if ( ref && (gift = EntRefToEntIndex(ref)) != INVALID_ENT_REFERENCE)
+	{
+		LogMessage("RemoveGift gift=%d", gift);
+		SDKUnhook(gift, SDKHook_Use, OnUse);
+		RemoveEntityGlow(gift);
+		AcceptEntityInput(ref, "kill");
+	}
+
+	return Plugin_Continue;
+}
+
+public OnUse(any:gift, any:client)
+{
+	LogMessage("OnUse:%N,%d", client, gift);
+	if (IsValidSurvivor(client))
+	{
+		decl String:strData[2];
+		GetEntPropString(gift, Prop_Data, "m_iName", strData, sizeof(strData));
+		new data = StringToInt(strData);
 		
-		CreateTimer(20.0, RemoveGift, entity, TIMER_FLAG_NO_MAPCHANGE);
+		new Float:vNew[3];
+		GetEntPropVector(gift, Prop_Data, "m_vecAbsOrigin", vNew);
+		vNew[2] += 20;
+		
+		decl Handle:dataPack;
+		dataPack = CreateDataPack();
+		WritePackCell(dataPack, vNew[0]);
+		WritePackCell(dataPack, vNew[1]);
+		WritePackCell(dataPack, vNew[2]);
+		
+		for (new i = 0; i < data; i++)
+		{
+			if (i == data -1)
+			{
+				WritePackCell(dataPack, 1);
+			} 
+			else 
+			{
+				WritePackCell(dataPack, 0);
+			}
+			
+			CreateTimer(0.1 + i * 0.1, DoRoll, dataPack, TIMER_FLAG_NO_MAPCHANGE);
+		}
+
+		SDKUnhook(gift, SDKHook_Use, OnUse);
+		RemoveEntityGlow(gift);
+		AcceptEntityInput(gift, "kill");
 	}
 }
 
-public Action:RemoveGift(Handle:timer, any:entity)
+bool:IsValidSurvivor(any:client)
 {
-	if (!IsValidEntity(entity))
-	{
-		return;
-	}
-	AcceptEntityInput(entity, "Kill");
-}
+	if (client < 1 || client > MaxClients) 
+		return false;
+	
+	if (!IsClientConnected(client)) 
+		return false;
+	
+	if (!IsClientInGame(client)) 
+		return false;
 
-public OnEntityDestroyed(entity)
-{
-	if (!IsValidEntity(entity))
-	{
-		return;
-	}
-	SDKUnhook(entity, SDKHook_OnTakeDamage, OnTakeDamage);
-}
-
-public Action:OnTakeDamage(int gift, int &attacker, int &inflictor, float &damage, int &damagetype)
-{
-	decl String:strData[2];
-	GetEntPropString(gift, Prop_Data, "m_iName", strData, sizeof(strData));
-	new data = StringToInt(strData);
+	if (IsFakeClient(client))
+	    return false;
 	
-	new Float:vNew[3];
-	GetEntPropVector(gift, Prop_Data, "m_vecAbsOrigin", vNew);
-	vNew[2] += 20;
-	
-	AcceptEntityInput(gift, "Kill");
-	
-	decl Handle:dataPack;
-	dataPack = CreateDataPack();
-	WritePackCell(dataPack, vNew[0]);
-	WritePackCell(dataPack, vNew[1]);
-	WritePackCell(dataPack, vNew[2]);
-	
-	for (new i = 0; i < data; i++)
-	{
-		CreateTimer(0.1 + i * 0.1, DoRoll, dataPack, TIMER_FLAG_NO_MAPCHANGE);
-	}
+	return true;
 }
 
 public Action:DoRoll(Handle:timer, Handle:pack)
@@ -216,7 +279,12 @@ public Action:DoRoll(Handle:timer, Handle:pack)
 	pos[0] = ReadPackCell(pack);
 	pos[1] = ReadPackCell(pack);
 	pos[2] = ReadPackCell(pack);
-	CloseHandle(pack);
+	new last = ReadPackCell(pack);
+	if (last == 1)
+	{
+		CloseHandle(pack);
+	}
+	
 	
 	new sRate = GetRandomInt(1, 1000) % 100 + 1;
 	//LogMessage("sRate=%i", sRate);
@@ -259,22 +327,6 @@ public Action:DoRoll(Handle:timer, Handle:pack)
 	TeleportEntity(ent, pos, NULL_VECTOR, NULL_VECTOR);
 }
 
-//GetLookPosition(client, Float:end[3])
-//{
-//	decl Float:start[3], Float:angle[3];
-//	GetClientEyePosition(client, start);
-//	GetClientEyeAngles(client, angle);
-//	TR_TraceRayFilter(start, angle, MASK_SOLID, RayType_Infinite, TraceEntityFilterPlayer, client);
-//	if (TR_DidHit(INVALID_HANDLE))
-//	{
-//		TR_GetEndPosition(end, INVALID_HANDLE);
-//	}
-//}
-
-//public bool:TraceEntityFilterPlayer(entity, contentsMask, any:data) 
-//{
-//	return entity > MaxClients;
-//}
 
 C_PrimWeapon()
 {
@@ -309,7 +361,7 @@ C_PrimWeapon()
 	{
 		ammo = 0;
 	}
-	weapon = CreateEneity(gun_Scripts[model]);
+	weapon = CreateEntity(gun_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",gun_Scripts[model]);
@@ -323,7 +375,7 @@ C_PrimWeapon()
 C_Melee()
 {
 	new weapon = -1;
-	weapon = CreateEneity("weapon_melee");
+	weapon = CreateEntity("weapon_melee");
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity 'weapon_melee'.");
@@ -358,7 +410,7 @@ C_SpWeapon()
 	{
 		ammo = 0;
 	}
-	weapon = CreateEneity(spweapon_Scripts[model]);
+	weapon = CreateEntity(spweapon_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",spweapon_Scripts[model]);
@@ -376,7 +428,7 @@ C_Generade()
 {
 	new weapon = -1;
 	new model = GetRandomInt(0, 2);
-	weapon = CreateEneity(generade_Scripts[model]);
+	weapon = CreateEntity(generade_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",generade_Scripts[model]);
@@ -390,7 +442,7 @@ C_Medkit()
 {
 	new weapon = -1;
 	new model = GetRandomInt(0, 3);
-	weapon = CreateEneity(medkit_Scripts[model]);
+	weapon = CreateEntity(medkit_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",medkit_Scripts[model]);
@@ -408,7 +460,7 @@ C_UpGAndCan()
 {
 	new weapon = -1;
 	new model = GetRandomInt(0, 5);
-	weapon = CreateEneity(upgcan_Scripts[model]);
+	weapon = CreateEntity(upgcan_Scripts[model]);
 	if (weapon == -1)
 	{
 		ThrowError("Failed to create entity %s.",upgcan_Scripts[model]);
@@ -418,37 +470,10 @@ C_UpGAndCan()
 	return weapon;
 }
 
-CreateEneity(const String:name[])
+CreateEntity(const String:name[])
 {
-	new count = GetEntityCount();
-	if(count > 3000)
-	{
-		LogMessage("current entity count:%d", count);
-		LogMessage("Entity Count Arrived 3000, Start Remove Not_In_hand Weapon!!");
-		RemoveEntities();
-	}
 	new entity = CreateEntityByName(name);
 	return entity;
-}
-
-RemoveEntities()
-{
-	new String:className[64];
-	for (new i = 0; i <= 4096; i++)
-	{
-		if(IsValidEntity(i))
-		{
-			GetEntityClassname(i, className, sizeof(className));
-			if (StrContains(className, "weapon", false) >= 0 && StrContains(className, "spawn", false) == -1)
-			{
-				new weaponState = GetEntProp(i, Prop_Data, "m_iState", 4, 0);
-				if (weaponState == 0)
-				{
-					AcceptEntityInput(i, "Kill");
-				}
-			}
-		}
-	}
 }
 
 Precache()
@@ -630,9 +655,9 @@ public Action:InitHiddenWeaponsDelayed(Handle:timer, any:client)
 	PreCacheGun("weapon_sniper_scout");
 	PreCacheGun("weapon_rifle_m60");
 	
-	decl String:Map[56];
-	GetCurrentMap(Map, sizeof(Map));
-	LogMessage("Hidden weapon initialization.");
+	// decl String:Map[56];
+	// GetCurrentMap(Map, sizeof(Map));
+	//LogMessage("Hidden weapon initialization.");
 	//ForceChangeLevel(Map, "Hidden weapon initialization.");			// plugin start change  map 已由其他插件实现
 }
 
@@ -641,4 +666,9 @@ static PreCacheGun(const String:GunEntity[])
 	new index = CreateEntityByName(GunEntity);
 	DispatchSpawn(index);
 	RemoveEdict(index);
+}
+
+GetRgbInt(red, green, blue)
+{
+	return (blue * 65536) + (green * 256) + red;
 }
