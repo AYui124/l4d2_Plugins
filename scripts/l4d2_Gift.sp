@@ -87,6 +87,31 @@ static String:upgcan_Scripts[6][] =
 	"weapon_upgradepack_incendiary"
 };
 
+static String:removeable_Scripts[21][] = 
+{
+    "weapon_grenade_launcher",
+	"weapon_rifle_m60",
+	"weapon_pistol",
+	"weapon_pistol_magnum",
+	"weapon_chainsaw",
+	"weapon_hunting_rifle",
+	"weapon_sniper_military",
+	"weapon_sniper_awp",
+	"weapon_sniper_scout",
+	"weapon_rifle",
+	"weapon_rifle_ak47",
+	"weapon_rifle_desert",
+	"weapon_rifle_sg552",
+	"weapon_pumpshotgun",
+	"weapon_shotgun_chrome",
+	"weapon_shotgun_spas",
+	"weapon_autoshotgun",
+	"weapon_smg",
+	"weapon_smg_silenced",
+	"weapon_smg_mp5",
+	"weapon_melee",
+};
+
 public Plugin:myinfo = 
 {
 	name = "l4d2_Gift",
@@ -162,7 +187,7 @@ CreateGifts(any:client, any:data)
 		SetEntPropFloat(entity, Prop_Send, "m_flModelScale", 0.8);
 		SetEntProp(entity, Prop_Send, "m_usSolidFlags", 8);
 		SetEntProp(entity, Prop_Send, "m_CollisionGroup", 11);
-		//SetEntityRenderColor(entity, 255, 88, 130, 255);
+		SetEntityRenderColor(entity, 255, 255, 255, 150);
 		CreateTimer(0.1, ColdDown, EntIndexToEntRef(entity), TIMER_FLAG_NO_MAPCHANGE);
 		
 	}
@@ -188,11 +213,11 @@ RemoveEntityGlow(entity)
 
 public Action:ColdDown(Handle:timer, any:ref)
 {
-	LogMessage("ColdDown ref=%d", ref);
+	//LogMessage("ColdDown ref=%d", ref);
 	int gift;
 	if (ref && (gift = EntRefToEntIndex(ref)) != INVALID_ENT_REFERENCE)
 	{
-		LogMessage("ColdDown gift=%d", gift);
+		//LogMessage("ColdDown gift=%d", gift);
 		SetEntityGlow(gift);
 		SDKHook(gift, SDKHook_Use, OnUse);
 		CreateTimer(30.0, RemoveGift, ref, TIMER_FLAG_NO_MAPCHANGE);
@@ -203,11 +228,11 @@ public Action:ColdDown(Handle:timer, any:ref)
 
 public Action:RemoveGift(Handle:timer, any:ref)
 {
-	LogMessage("RemoveGift ref=%d", ref);
+	//LogMessage("RemoveGift ref=%d", ref);
 	int gift;
 	if ( ref && (gift = EntRefToEntIndex(ref)) != INVALID_ENT_REFERENCE)
 	{
-		LogMessage("RemoveGift gift=%d", gift);
+		//LogMessage("RemoveGift gift=%d", gift);
 		SDKUnhook(gift, SDKHook_Use, OnUse);
 		RemoveEntityGlow(gift);
 		AcceptEntityInput(ref, "kill");
@@ -218,7 +243,7 @@ public Action:RemoveGift(Handle:timer, any:ref)
 
 public OnUse(any:gift, any:client)
 {
-	LogMessage("OnUse:%N,%d", client, gift);
+	//LogMessage("OnUse:%N,%d", client, gift);
 	if (IsValidSurvivor(client))
 	{
 		decl String:strData[2];
@@ -248,7 +273,6 @@ public OnUse(any:gift, any:client)
 			
 			CreateTimer(0.1 + i * 0.1, DoRoll, dataPack, TIMER_FLAG_NO_MAPCHANGE);
 		}
-
 		SDKUnhook(gift, SDKHook_Use, OnUse);
 		RemoveEntityGlow(gift);
 		AcceptEntityInput(gift, "kill");
@@ -323,7 +347,7 @@ public Action:DoRoll(Handle:timer, Handle:pack)
 	{
 		LogMessage("Wrong:sRate=%i", sRate);
 	}
-	
+	CreateTimer(30.0, RemoveGun, EntIndexToEntRef(ent), TIMER_FLAG_NO_MAPCHANGE);
 	TeleportEntity(ent, pos, NULL_VECTOR, NULL_VECTOR);
 }
 
@@ -474,6 +498,54 @@ CreateEntity(const String:name[])
 {
 	new entity = CreateEntityByName(name);
 	return entity;
+}
+
+public Action:RemoveGun(Handle:timer, any:ref)
+{
+	new ent;
+	if (ref && (ent = EntRefToEntIndex(ref)) != INVALID_ENT_REFERENCE)
+	{
+		decl String:className[64];
+		GetEntityClassname(ent, className, sizeof(className));
+		//LogMessage("class=%s", className);
+		for (new i = 0; i < 21; i++) 
+		{
+            if (StrEqual(removeable_Scripts[i], className, false))
+			{
+				if (!HasEntProp(ent, Prop_Data, "m_iState"))
+				{
+					continue;
+				}
+				new weaponState = GetEntProp(ent, Prop_Data, "m_iState", 4, 0);
+				if (weaponState == 0)
+				{
+					AcceptEntityInput(ent, "Kill");
+					break;
+				}
+			}
+		}
+	}
+}
+
+public Action:InitHiddenWeaponsDelayed(Handle:timer, any:client)
+{
+	PreCacheGun("weapon_rifle_sg552");
+	PreCacheGun("weapon_smg_mp5");
+	PreCacheGun("weapon_sniper_awp");
+	PreCacheGun("weapon_sniper_scout");
+	PreCacheGun("weapon_rifle_m60");
+	
+	// decl String:Map[56];
+	// GetCurrentMap(Map, sizeof(Map));
+	//LogMessage("Hidden weapon initialization.");
+	//ForceChangeLevel(Map, "Hidden weapon initialization.");			// plugin start change  map 已由其他插件实现
+}
+
+static PreCacheGun(const String:GunEntity[])
+{
+	new index = CreateEntityByName(GunEntity);
+	DispatchSpawn(index);
+	RemoveEdict(index);
 }
 
 Precache()
@@ -645,27 +717,6 @@ Precache()
 	{
 		PrecacheModel("models/weapons/melee/w_shovel.mdl", true);
 	}
-}
-
-public Action:InitHiddenWeaponsDelayed(Handle:timer, any:client)
-{
-	PreCacheGun("weapon_rifle_sg552");
-	PreCacheGun("weapon_smg_mp5");
-	PreCacheGun("weapon_sniper_awp");
-	PreCacheGun("weapon_sniper_scout");
-	PreCacheGun("weapon_rifle_m60");
-	
-	// decl String:Map[56];
-	// GetCurrentMap(Map, sizeof(Map));
-	//LogMessage("Hidden weapon initialization.");
-	//ForceChangeLevel(Map, "Hidden weapon initialization.");			// plugin start change  map 已由其他插件实现
-}
-
-static PreCacheGun(const String:GunEntity[])
-{
-	new index = CreateEntityByName(GunEntity);
-	DispatchSpawn(index);
-	RemoveEdict(index);
 }
 
 GetRgbInt(red, green, blue)
