@@ -4,7 +4,7 @@
 #define PLUGIN_NAME           "l4d2_happyFestival"
 #define PLUGIN_AUTHOR         "mYui"
 #define PLUGIN_DESCRIPTION    "Gives Infinite Ammo when festival"
-#define PLUGIN_VERSION        "1.3"
+#define PLUGIN_VERSION        "1.4"
 #define PLUGIN_URL            "NA"
 
 #define MaxClients 32
@@ -18,7 +18,8 @@
 #pragma semicolon 1
 
 new Throwing[MaxClients+1];
-new Inited;
+new Allowed;
+new bool:InitFinished;
 new bool:IsFestival;
 new IsWeekend;
 int Rate;
@@ -49,14 +50,15 @@ public OnPluginStart()
 
 public OnMapStart()
 {
-	Inited = 0;
+	Allowed = 0;
 	FailedCount = 0.0;
 }
 
 public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 {
-	if (Inited == 0)
+	if (Allowed == 0 && !InitFinished)
 	{
+		Allowed = 1;
 		InitData(client);
 		if (IsFestival)
 		{
@@ -75,19 +77,18 @@ public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 			PrintToChatAll("\x05银趴结束了!");
 		}
 		CreateTimer(60.0, ReSet, _, TIMER_FLAG_NO_MAPCHANGE);
-		Inited = 1;
-		
-		
+		InitFinished = true;
 	}
 }
 
 public Action:ReSet(Handle:timer)
 {
-	Inited = 0;
+	Allowed = 0;
 }
 
 public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	InitFinished = false;
 	IsFestival = false;
 	IsWeekend = 0;
 	ReadTxt();

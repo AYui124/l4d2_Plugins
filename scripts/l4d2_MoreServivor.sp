@@ -4,8 +4,11 @@
 #pragma newdecls required
 #pragma semicolon 1
 
+#define DEBUG true
+
 ConVar handleMaxSurvivor;
 ConVar handleMinSurvivor;
+Handle setHumanIdle;
 
 public Plugin myinfo =
 {
@@ -19,9 +22,25 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
+    InitSdkCall();
     HookEvents();
     SetConvar();
     AddCmds();
+}
+
+void InitSdkCall()
+{
+
+    GameData gameData = LoadGameConfigFile("linchpin");
+    if (gameData == null)
+    {
+        SetFailState("Game data missing!");
+        return;
+    }   
+    StartPrepSDKCall(SDKCall_Player);
+    PrepSDKCall_SetFromConf(gameData, SDKConf_Signature, "SetHumanIdle");
+    PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+    setHumanIdle = EndPrepSDKCall();
 }
 
 void HookEvents()
@@ -40,6 +59,8 @@ void AddCmds()
 {
     RegConsoleCmd("sm_add", CmdAddBot);
     RegConsoleCmd("sm_remove", CmdRemoveBot);
+    RegConsoleCmd("sm_afk", CmdAfk);
+    RegConsoleCmd("sm_count", CmdCount);
 }
 
 public Action CmdAddBot(int client, int args)
@@ -50,6 +71,20 @@ public Action CmdAddBot(int client, int args)
 public Action CmdRemoveBot(int client, int args)
 {
     TryRemoveBot();
+}
+
+public Action CmdCount(int client, int args)
+{
+    int all = GetSurvivorCount(0);
+    int bot = GetSurvivorCount(1);
+    int idle = GetSurvivorCount(2);
+    int player = GetSurvivorCount(3);
+    PrintToChat(client, "all=%d, bot=%d, idle=%d, player=%d", all, bot, idle, player);
+}
+
+public Action CmdAfk(int client, int args)
+{
+    ChangeClientTeam(client, 1);
 }
 
 void RoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -64,8 +99,10 @@ void RoundEnd(Event event, const char[] name, bool dontBroadcast)
 
 public void OnClientConnected(int client)
 {
+    LogMessage("client connected: %N", client);
     if (IsVaildClient(client, 2, false) || IsVaildClient(client, 1, false))
     {
+        LogMessage("client valid");
         int bot = FindAvailableBot();
         if (bot <= 0)
         {
@@ -86,12 +123,14 @@ public void OnClientDisconnect(int client)
 {
     if (IsVaildClient(client, 2, false) || IsVaildClient(client, 1, false))
     {
+        LogMessage("client valid");
         TryRemoveBot();
     }
 }
 
 bool TryAddBot()
 {
+    LogMessage("TryAddBot()");
     if (!IsReachMaxSurvivorCount())
     {
         SpawnFakeClient();
@@ -102,6 +141,7 @@ bool TryAddBot()
 
 void TryRemoveBot()
 {
+    LogMessage("TryRemoveBot()");
     int minCount = GetConVarInt(handleMinSurvivor);  
     int botCount = GetSurvivorCount(1);
     int allCount = GetSurvivorCount(0);
@@ -118,10 +158,13 @@ void TryRemoveBot()
 void TakeOver(int client, int bot)
 {
     LogMessage("TakeOver %N %d", client, bot);
+    SDKCall(setHumanIdle, bot, client);
+    SetEntProp(client, Prop_Send, "m_iObserverMode", 5);
 }
 
 int FindAvailableBot()
 {
+    LogMessage("FindAvailableBot()");
     for (int i = 1; i < MaxClients; i++)
     {
         if (IsVaildClient(i, 2, true))
