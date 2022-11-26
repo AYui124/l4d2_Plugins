@@ -31,7 +31,7 @@ public void OnPluginStart()
 void InitSdkCall()
 {
 
-    GameData gameData = LoadGameConfigFile("linchpin");
+    GameData gameData = LoadGameConfigFile("l4d2_MoreSurvivor");
     if (gameData == null)
     {
         SetFailState("Game data missing!");
@@ -60,6 +60,7 @@ void AddCmds()
     RegConsoleCmd("sm_add", CmdAddBot);
     RegConsoleCmd("sm_remove", CmdRemoveBot);
     RegConsoleCmd("sm_afk", CmdAfk);
+    RegConsoleCmd("sm_spec", CmdSpec);
     RegConsoleCmd("sm_count", CmdCount);
 }
 
@@ -79,17 +80,42 @@ public Action CmdCount(int client, int args)
     int bot = GetSurvivorCount(1);
     int idle = GetSurvivorCount(2);
     int player = GetSurvivorCount(3);
-    PrintToChat(client, "all=%d, bot=%d, idle=%d, player=%d", all, bot, idle, player);
+    if (client > 0)
+    {
+        PrintToChat(client, "all=%d, bot=%d, idle=%d, player=%d", all, bot, idle, player);
+    } 
+    else 
+    {
+        PrintToServer("all=%d, bot=%d, idle=%d, player=%d", all, bot, idle, player);
+    }
 }
 
 public Action CmdAfk(int client, int args)
 {
-    ChangeClientTeam(client, 1);
+    if (IsVaildClient(client, 2, false))
+    {
+        AcceptEntityInput(client, "clearparent");
+        ChangeClientTeam(client, 1);
+    }
+}
+
+public Action CmdSpec(int client, int args)
+{
+    if (IsVaildClient(client, 2, false))
+    {
+        AcceptEntityInput(client, "clearparent");
+        ChangeClientTeam(client, 1);
+        int target = FindSpecBot(client);
+        if (HasEntProp(target, Prop_Send, "m_humanSpectatorUserID"))
+        {
+            SetEntProp(target, Prop_Send, "m_humanSpectatorUserID", 0);
+        }
+    }
 }
 
 void RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-    
+    CreateTimer(2.0, TimerAddBot, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 void RoundEnd(Event event, const char[] name, bool dontBroadcast)
@@ -97,18 +123,29 @@ void RoundEnd(Event event, const char[] name, bool dontBroadcast)
     
 }
 
-public void OnClientConnected(int client)
+public Action TimerAddBot(Handle timer)
+{
+    int minCount = GetConVarInt(handleMinSurvivor);
+    int all = GetSurvivorCount(0);
+    if(all < minCount) 
+    {
+        TryAddBot();
+        CreateTimer(0.2, TimerAddBot, _, TIMER_FLAG_NO_MAPCHANGE);
+    }
+}    
+
+public void OnClientPostAdminCheck(int client)
 {
     LogMessage("client connected: %N", client);
     if (IsVaildClient(client, 2, false) || IsVaildClient(client, 1, false))
     {
         LogMessage("client valid");
-        int bot = FindAvailableBot();
+        int bot = FindAvailableSurvivorBot();
         if (bot <= 0)
         {
             if(TryAddBot())
             {
-                bot = FindAvailableBot();
+                bot = FindAvailableSurvivorBot();
             }
         }
         if (bot > 0)
@@ -121,6 +158,7 @@ public void OnClientConnected(int client)
 
 public void OnClientDisconnect(int client)
 {
+    LogMessage("client disconnect: %N", client);
     if (IsVaildClient(client, 2, false) || IsVaildClient(client, 1, false))
     {
         LogMessage("client valid");
@@ -147,7 +185,7 @@ void TryRemoveBot()
     int allCount = GetSurvivorCount(0);
     if (botCount > 0 && allCount > minCount)
     {
-        int bot = FindAvailableBot();
+        int bot = FindAvailableSurvivorBot();
         if (bot > 0)
         {
             KickClient(bot, "Kick FakeClient");
@@ -162,7 +200,7 @@ void TakeOver(int client, int bot)
     SetEntProp(client, Prop_Send, "m_iObserverMode", 5);
 }
 
-int FindAvailableBot()
+int FindAvailableSurvivorBot()
 {
     LogMessage("FindAvailableBot()");
     for (int i = 1; i < MaxClients; i++)
@@ -170,6 +208,10 @@ int FindAvailableBot()
         if (IsVaildClient(i, 2, true))
         {
             if (!IsFakeClient(i))
+            {
+                continue;
+            }
+            if (IsClientInKickQueue(i))
             {
                 continue;
             }
@@ -199,6 +241,18 @@ int GetIdledPlayer(int bot)
         return client;
     }
     return 0;
+}
+
+int FindSpecBot(int client)
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+	    if(GetIdledPlayer(i) == client)
+        {
+            return i;
+        }
+	}
+	return 0;
 }
 
 bool IsReachMaxSurvivorCount()

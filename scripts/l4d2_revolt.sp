@@ -137,8 +137,6 @@ public Action JoinInfected(Handle timer, int client)
 public Action JoinSurvivor(Handle timer, int client)
 {
     int target = FindBot(2);
-    Handle gameMode = FindConVar("mp_gamemode");
-    SendConVarValue(client, gameMode, "coop");
     SDKCall(setHumanSpec, target, client);
     SDKCall(takeOverBot, client, true);
 }
@@ -150,12 +148,12 @@ public void OnMapStart()
 
 public void RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-	ResetToSurvivor();
 }
 
 public void RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
-
+	LogMessage("Round End");
+	ResetToSurvivor();
 }
 
 public void OnClientPostAdminCheck(int client)
@@ -182,6 +180,10 @@ void SwitchToSpec(int client)
 {
 	AcceptEntityInput(client, "clearparent");
 	ChangeClientTeam(client, 1);
+
+	Handle gameMode = FindConVar("mp_gamemode");
+	SendConVarValue(client, gameMode, "coop");
+
 	int target = FindSpecBot(client);
 	if (HasEntProp(target, Prop_Send, "m_humanSpectatorUserID"))
 	{

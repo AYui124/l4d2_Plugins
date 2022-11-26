@@ -385,23 +385,18 @@ bool:IsValidSurvivor(client, bool:allowbots)
 ReadTxt()
 {
 	new Handle:file = INVALID_HANDLE;
-	decl String:folderPath[256];
-	Format(folderPath, 256, "/addons/sourcemod/data/festival");
-	decl String:filePath[256];
-	Format(filePath, 256, "%s/%s.txt", folderPath, "banned");
-	if (!FileExists(filePath, false, "GAME"))
-	{
-		LogMessage("Error file '%s' not existed.", filePath);
-	}
+	new String:filePath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, filePath, sizeof(filePath), "data/festival/banned.txt");
 	if (file != INVALID_HANDLE)
 	{
 		CloseHandle(file);
 		file = INVALID_HANDLE;
 	}
-	file = OpenFile(filePath, "r", false, "GAME");
+	file = OpenFile(filePath, "r");
 	if (!file)
 	{
 		LogError("Error opening file via file '%s'.", filePath);
+		return -1;
 	}
 
 	decl String:buffer[32];
