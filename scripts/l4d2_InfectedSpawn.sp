@@ -26,6 +26,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
+#include <left4dhooks>
 
 new siCount;
 new siLimit;
@@ -93,25 +94,23 @@ public void OnPluginStart()
 	handleMusicEnable = CreateConVar("l4d_is_music_enable", "1", "允许播放音乐，音乐播放时仅生成一种特感");
 	handleMusicSpawnInterval = CreateConVar("l4d_is_music_spawn_interval", "1.0", "播放音乐时的特感生成间隔");
 	handleMusicRate = CreateConVar("l4d_is_music_rate", "1", "允许播放音乐的几率(每20波特感)");
-	//AutoExecConfig(true, "l4d2_InfectedSpawn");
+	// AutoExecConfig(true, "l4d2_InfectedSpawn");
 	handleSpawnEnabled = CreateConVar("l4d_is_spawn_enabled", "1", "是否生成特感");
 	handleSurvivorCount = CreateConVar("custom_survivor_count", "1", "幸存者人数(决定特感上限)");
 
 	CreateConVar("tank_rate_up", "0", "", FCVAR_DONTRECORD);
 	
-	SetConVarInt(FindConVar("z_smoker_limit"), 0);
-	SetConVarInt(FindConVar("z_boomer_limit"), 0);
-	SetConVarInt(FindConVar("z_hunter_limit"), 0);
-	SetConVarInt(FindConVar("z_spitter_limit"), 0);
-	SetConVarInt(FindConVar("z_jockey_limit"), 0);
-	SetConVarInt(FindConVar("z_charger_limit"), 0);
-	//SetConVarInt(FindConVar("z_attack_flow_range"), 50000);
+	// SetConVarInt(FindConVar("z_smoker_limit"), 0);
+	// SetConVarInt(FindConVar("z_boomer_limit"), 0);
+	// SetConVarInt(FindConVar("z_hunter_limit"), 0);
+	// SetConVarInt(FindConVar("z_spitter_limit"), 0);
+	// SetConVarInt(FindConVar("z_jockey_limit"), 0);
+	// SetConVarInt(FindConVar("z_charger_limit"), 0);
 	SetConVarInt(FindConVar("z_spawn_range"), 800);
 	SetConVarInt(FindConVar("z_spawn_safety_range"), 400);
 	SetConVarInt(FindConVar("z_cooldown_spawn_safety_range"), 500);
 	SetConVarInt(FindConVar("z_finale_spawn_safety_range"), 400);
-	SetConVarInt(FindConVar("director_no_specials"), 1);
-	//SetConVarInt(FindConVar("z_spawn_flow_limit"), 50000);
+	// SetConVarInt(FindConVar("director_no_specials"), 1);
 	
 	HookEvents();
 }
@@ -160,7 +159,7 @@ StartSpawnTimer()
 	}
 	else
 	{
-		siLimit = GetSurvivorCount(false);
+		siLimit = GetSurvivorCount(true);
 	}
 
 	if (musicPlaying)
@@ -212,7 +211,7 @@ CalucateSiLimit()
 	new survivorCount = GetConVarInt(handleSurvivorCount);
 	if(survivorCount <= 0)
 	{
-		return GetSurvivorCount(false);
+		return GetSurvivorCount(true);
 	}
 	else if(survivorCount <= 1)
 	{
@@ -327,16 +326,43 @@ GenerateSpawn(client)
 		{
 			if(spawnQueue[i] < 0) //stops if the current array index is out of bound
 				break;
-			new bot = CreateFakeClient("Infected Bot");
-			if (bot != 0)
+			if(!L4dHookSpawnSpecial(client, spawnQueue[i]))
 			{
-				ChangeClientTeam(bot, 3);
-				CreateTimer(0.1, KickBot, bot);
+				ZspawnSpecial(client, spawnQueue[i]);
 			}
-			CheatCommand(client, "z_spawn_old", spawns[spawnQueue[i]]); 
 			firstSpawn = false;
-		
 		}
+	}
+}
+
+ZspawnSpecial(any: client, any: type)
+{
+	new bot = CreateFakeClient("Infected Bot");
+	if (bot != 0)
+	{
+		ChangeClientTeam(bot, 3);
+		CreateTimer(0.1, KickBot, bot);
+	}
+	CheatCommand(client, "z_spawn_old", spawns[type]); 
+}
+
+bool:L4dHookSpawnSpecial(any: client, any: type)
+{
+	new Float:vPos[3];
+	new class = type == SI_TANK ? type + 2 : type + 1;
+    
+	if (!L4D_GetRandomPZSpawnPosition(client, class, 20, vPos))
+	{
+		LogMessage("Couldn't find a valid spawn position in 20 tries");
+		return false;
+	}
+	if(class == IS_TANK)
+	{
+		return L4D2_SpawnTank(vPos, NULL_VECTOR) > 0;
+	} 
+	else 
+	{
+		return L4D2_SpawnSpecial(class, vPos, NULL_VECTOR) > 0;
 	}
 }
 
@@ -445,7 +471,7 @@ GenerateIndex()
 public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {	
 	//and we reset some variables
-	SetConVarInt(handleSpawnEnabled, 0);
+	//SetConVarInt(handleSpawnEnabled, 0);
 	leftSafeRoom = false;
 	musicTimeCount = 0;
 	musicPlaying = false;

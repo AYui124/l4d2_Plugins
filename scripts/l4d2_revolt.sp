@@ -1,6 +1,9 @@
 #include <sdkhooks>
 #include <sdktools>
 #include <sourcemod>
+#include <left4dhooks>
+
+#pragma newdecls required
 #pragma semicolon 1
 
 #define GAMEDATA_FILENAME "l4d2_revolt"
@@ -78,7 +81,7 @@ void InitSdkCall()
 		SetFailState("Cant initialize TakeOverBot SDKCall");
 		return;
 	}
-	//propGhost = FindSendPropInfo("CTerrorPlayer", "m_isGhost");
+	//
 }
 
 void HookEvents()
@@ -86,6 +89,7 @@ void HookEvents()
 	HookEvent("round_start", RoundStart);
 	HookEvent("round_end", RoundEnd);
 	HookEvent("player_death", PlayerDeath, EventHookMode_Pre);
+	HookEvent("map_transition", MapTransition, EventHookMode_PostNoCopy);
 }
 
 void RegisterCmds()
@@ -116,7 +120,7 @@ public Action CmdJoinInfected(int client, int args)
 
 public Action JoinInfected(Handle timer, int client)
 {
-	if (!IsValidClient(client, false) && GetClientTeam(client) == 1)
+	if (!IsValidClient(client, false) && GetClientTeam(client) != 1)
 	{
         return;
 	}
@@ -125,6 +129,7 @@ public Action JoinInfected(Handle timer, int client)
 	{
 		Handle gameMode = FindConVar("mp_gamemode");
 		SendConVarValue(client, gameMode, "versus");
+
 		SDKCall(takeOverInfected, client, target);
 		SDKCall(stateTransition, client, 8);
 	}
@@ -136,9 +141,15 @@ public Action JoinInfected(Handle timer, int client)
 
 public Action JoinSurvivor(Handle timer, int client)
 {
-    int target = FindBot(2);
-    SDKCall(setHumanSpec, target, client);
-    SDKCall(takeOverBot, client, true);
+	int target = FindBot(2);
+	if (target > 0)
+	{
+		Handle gameMode = FindConVar("mp_gamemode");
+		SendConVarValue(client, gameMode, "coop");
+		
+		SDKCall(setHumanSpec, target, client);
+		SDKCall(takeOverBot, client, true);
+	}
 }
 
 public void OnMapStart()
@@ -152,7 +163,12 @@ public void RoundStart(Event event, const char[] name, bool dontBroadcast)
 
 public void RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
-	LogMessage("Round End");
+	//LogMessage("Round End");
+	ResetToSurvivor();
+}
+
+void MapTransition(Event event, const char[] name, bool dontBroadcast)
+{
 	ResetToSurvivor();
 }
 
@@ -181,9 +197,6 @@ void SwitchToSpec(int client)
 	AcceptEntityInput(client, "clearparent");
 	ChangeClientTeam(client, 1);
 
-	Handle gameMode = FindConVar("mp_gamemode");
-	SendConVarValue(client, gameMode, "coop");
-
 	int target = FindSpecBot(client);
 	if (HasEntProp(target, Prop_Send, "m_humanSpectatorUserID"))
 	{
@@ -198,6 +211,17 @@ int FindBot(int team)
 		if (IsValidClient(i, true) && IsFakeClient(i) && GetClientTeam(i) == team && !IsClientInKickQueue(i))
 		{
 			return i;
+			// if (team == 3)
+			// {
+			// 	if (IsGhost(i))
+			// 	{
+			// 		return i;
+			// 	}
+			// }
+			// else if (team == 2)
+			// {
+			// 	return i;
+			// }
 		}
 	}
 	return 0;
@@ -255,9 +279,10 @@ void ResetToSurvivor()
 	}
 }
 
-// bool IsGhost(client)
+// bool IsGhost(int client)
 // {
-// 	return GetEntData(client, propGhost, 1) == 1;
+// 	int propGhost = FindSendPropInfo("CTerrorPlayer", "m_isGhost");
+// 	return GetEntData(client, propGhost, 4) == 1;
 // }
 
 

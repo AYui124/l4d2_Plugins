@@ -57,11 +57,9 @@ void SetConvar()
 
 void AddCmds()
 {
-    RegConsoleCmd("sm_add", CmdAddBot);
-    RegConsoleCmd("sm_remove", CmdRemoveBot);
-    RegConsoleCmd("sm_afk", CmdAfk);
+    RegAdminCmd("sm_add", CmdAddBot, ADMFLAG_CHEATS);
+    RegAdminCmd("sm_remove", CmdRemoveBot, ADMFLAG_CHEATS);
     RegConsoleCmd("sm_spec", CmdSpec);
-    RegConsoleCmd("sm_count", CmdCount);
 }
 
 public Action CmdAddBot(int client, int args)
@@ -72,31 +70,6 @@ public Action CmdAddBot(int client, int args)
 public Action CmdRemoveBot(int client, int args)
 {
     TryRemoveBot();
-}
-
-public Action CmdCount(int client, int args)
-{
-    int all = GetSurvivorCount(0);
-    int bot = GetSurvivorCount(1);
-    int idle = GetSurvivorCount(2);
-    int player = GetSurvivorCount(3);
-    if (client > 0)
-    {
-        PrintToChat(client, "all=%d, bot=%d, idle=%d, player=%d", all, bot, idle, player);
-    } 
-    else 
-    {
-        PrintToServer("all=%d, bot=%d, idle=%d, player=%d", all, bot, idle, player);
-    }
-}
-
-public Action CmdAfk(int client, int args)
-{
-    if (IsVaildClient(client, 2, false))
-    {
-        AcceptEntityInput(client, "clearparent");
-        ChangeClientTeam(client, 1);
-    }
 }
 
 public Action CmdSpec(int client, int args)
@@ -136,10 +109,10 @@ public Action TimerAddBot(Handle timer)
 
 public void OnClientPostAdminCheck(int client)
 {
-    LogMessage("client connected: %N", client);
+    //LogMessage("client connected: %N", client);
     if (IsVaildClient(client, 2, false) || IsVaildClient(client, 1, false))
     {
-        LogMessage("client valid");
+        //LogMessage("client valid");
         int bot = FindAvailableSurvivorBot();
         if (bot <= 0)
         {
@@ -158,10 +131,10 @@ public void OnClientPostAdminCheck(int client)
 
 public void OnClientDisconnect(int client)
 {
-    LogMessage("client disconnect: %N", client);
+    //LogMessage("client disconnect: %N", client);
     if (IsVaildClient(client, 2, false) || IsVaildClient(client, 1, false))
     {
-        LogMessage("client valid");
+        //LogMessage("client valid");
         TryRemoveBot();
     }
 }
@@ -227,7 +200,11 @@ int FindAvailableSurvivorBot()
 
 int GetIdledPlayer(int bot)
 {
-    if (!IsVaildClient(bot, 2, true) && !IsFakeClient(bot))
+    if (!IsVaildClient(bot, 2, true))
+    {
+        return 0;
+    }
+    if (!IsFakeClient(bot))
     {
         return 0;
     }
