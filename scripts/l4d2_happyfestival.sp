@@ -22,7 +22,8 @@ new Allowed;
 new bool:InitFinished;
 new bool:IsFestival;
 new IsWeekend;
-int Rate;
+new rate;
+new Float:compareRate;
 new Float:FailedCount;
 new String:saveList[MaxListCount][32];
 new count;
@@ -66,11 +67,11 @@ public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 		} 
 		else if (IsWeekend == 1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,我的呱呱!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,我的呱呱!", client, rate);
 		}
 		else if (IsWeekend == -1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,你小子!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x05<\x04%.2f\x03 ,你小子!", client, rate, compareRate);
 		}
 		else
 		{
@@ -91,6 +92,7 @@ public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadc
 	InitFinished = false;
 	IsFestival = false;
 	IsWeekend = 0;
+	compareRate = 100.0;
 	ReadTxt();
 }
 
@@ -290,34 +292,38 @@ InitData(any:client)
 		IsFestival = true;
 		return;
 	}
-	new multiRate = GetRandomInt(100, 2000);
-	Rate = GetRandomInt(0, multiRate * client) % 100 + 1;
-	LogMessage("rate=%d",Rate);
-	
+	new multiRate = GetRandomInt(100, 1000);
+	rate = GetRandomInt(0, multiRate * client) % 100 + 1;
+	LogMessage("rate=%d",rate);
 	if(StrEqual(week,"Saturday") 
 		|| StrEqual(week,"Sunday") 
 		|| StrEqual(week,"Friday") && IsAfterEvening(hour, minute) 
 		|| StrEqual(week,"Monday") && IsBeforeMorning(hour, minute))
 	{
 		LogMessage("weekend=true");
-		new Float:compareRate = FailedCount == 0 ? 50.0 : (50.0 / SquareRoot(FailedCount));
-		LogMessage("compareRate=%f", compareRate);
-		if (compareRate < 10.0)
-		{
-			compareRate = 10.0;
-		}
-		if (Rate > compareRate)
-		{
-			IsWeekend = 1;
-			FailedCount = 0.0;
-		}
-		else
-		{
-			IsWeekend = -1;
-			FailedCount = FailedCount + 1.0;
-		}
+		compareRate = FailedCount == 0 ? 50.0 : (50.0 / SquareRoot(FailedCount));
+	} 
+	else
+	{
+		new Float: add = GetRandomFloat(5.0, 25.0 - FailedCount < 10 ? FailedCount * 2 : 20.0);
+		compareRate = FailedCount == 0 ? (50.0 + add) : ((50.0 + add) / SquareRoot(FailedCount)); 
 	}
 	
+	LogMessage("compareRate=%f", compareRate);
+	if (compareRate < 20.0)
+	{
+		compareRate = 20.0;
+	}
+	if (rate > compareRate)
+	{
+		IsWeekend = 1;
+		FailedCount = 0.0;
+	}
+	else
+	{
+		IsWeekend = -1;
+		FailedCount = FailedCount + 1.0;
+	}
 }
 
 bool:IsAfterEvening(char[] hour, char[] minute)
@@ -338,7 +344,6 @@ bool:IsBeforeMorning(char[] hour, char[] minute)
 bool:IsEnabled(int client, bool:isWeapon)
 {
 	return (IsFestival || IsWeekend == 1) && (!isWeapon || IsAuthorizedSurvivor(client));
-	//return (!isWeapon || IsAuthorizedSurvivor(client));
 }
 
 bool:IsAuthorizedSurvivor(int client)

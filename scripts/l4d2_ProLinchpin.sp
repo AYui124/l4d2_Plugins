@@ -55,12 +55,12 @@ new lastCola;
 colaC[20000];
 //近战速度
 new bool:isLoading;
-new nextPrimaryAttackOffset = -1;
-new activeWeaponOffset;
-new Float:meleeAttackNextTimeFlame = -1.0;
-new meleeAttackMeleeEnt = -1;
-new meleeAttackNotMeleeEnt = -1;
-new meleeAttackCount = -1;
+// new nextPrimaryAttackOffset = -1;
+// new activeWeaponOffset;
+// new Float:meleeAttackNextTimeFlame = -1.0;
+// new meleeAttackMeleeEnt = -1;
+// new meleeAttackNotMeleeEnt = -1;
+// new meleeAttackCount = -1;
 //witch发光
 new fCount;
 new witchColor[20000];
@@ -85,7 +85,7 @@ new Float:vecX;
 new Float:vecY;
 new Handle:t_HitBack;
 //model fix
-new MODEL_DEFIB;
+//new MODEL_DEFIB;
 
 static String:randomScripts[30][] =
 {
@@ -814,6 +814,7 @@ public Action: DeleteDeadBody(Handle:timer)
 /*---处理开局选定---*/
 public Action:InitFuction(Handle:timer)
 {
+	KillAllFakeBot();
 	PreList();
 	CreateTimer(0.1, FirstSetLinchpin, _, TIMER_FLAG_NO_MAPCHANGE);
 }
@@ -857,11 +858,6 @@ public Action:FirstSetLinchpin(Handle:timer)
 
 public Action:ChooseAndSet(Handle:timer)
 {
-	if (num == 0)
-	{
-		KillAll();
-		return Plugin_Continue;
-	}
 	if (isPrinting)
 	{
 		CreateTimer(0.1, ChooseAndSet, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -981,10 +977,10 @@ PrintList()
 {
 	isPrinting = true;
 	PrintToChatAll("\x03当前更新范围:\x04%i\x03人",num);
-	for (new i = 0; i < SurCount; i++)
-	{
-		PrintToChatAll("\x01%s",survivorsName[i]);
-	}
+	// for (new i = 0; i < SurCount; i++)
+	// {
+	// 	PrintToChatAll("\x01%s",survivorsName[i]);
+	// }
 	isPrinting = false;
 }
 
@@ -1367,7 +1363,12 @@ public Action:TimerKickPlayer(Handle:timer,any:client)
 
 public Action:TimerKillAllAlivedFakeBot(Handle:timer)
 {
-	for (new i = 1; i <= MaxClients; i++)
+	KillAllFakeBot();
+}
+
+KillAllFakeBot()
+{
+    for (new i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && GetClientTeam(i) == 2 && IsFakeClient(i) && IsPlayerAlive(i))
 		{
@@ -2699,44 +2700,44 @@ GiveCommand(client, const String:command[], const String:argument1[], const Stri
     SetUserFlagBits(client, admindata);
 }
 
-GetVictim(client)
-{
-    new victim = 0;
-    /* Charger */
-    victim = GetEntPropEnt(client, Prop_Send, "m_pummelVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
-    victim = GetEntPropEnt(client, Prop_Send, "m_carryVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
+// GetVictim(client)
+// {
+//     new victim = 0;
+//     /* Charger */
+//     victim = GetEntPropEnt(client, Prop_Send, "m_pummelVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
+//     victim = GetEntPropEnt(client, Prop_Send, "m_carryVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
 
-    /* Hunter */
-    victim = GetEntPropEnt(client, Prop_Send, "m_pounceVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
+//     /* Hunter */
+//     victim = GetEntPropEnt(client, Prop_Send, "m_pounceVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
 
-    /* Smoker */
-    victim = GetEntPropEnt(client, Prop_Send, "m_tongueVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
+//     /* Smoker */
+//     victim = GetEntPropEnt(client, Prop_Send, "m_tongueVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
 
-    /* Jockey */
-    victim = GetEntPropEnt(client, Prop_Send, "m_jockeyVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
+//     /* Jockey */
+//     victim = GetEntPropEnt(client, Prop_Send, "m_jockeyVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
 
-    return -1;
-}
+//     return -1;
+// }
 
 GetCurrentMapEx(String:map[],length)
 {
