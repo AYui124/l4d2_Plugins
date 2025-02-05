@@ -13,7 +13,6 @@
 #include <sourcemod>
 #include <sdktools>
 #include <left4dhooks>
-#include <smlib>
 
 #pragma semicolon 1
 
@@ -47,6 +46,7 @@ public OnPluginStart()
 	HookEvent("weapon_drop", Event_WeaponDrop);
 	HookEvent("player_disconnect", Event_PlayerDisconnect);
 	HookEvent("round_start", EventRoundStart);
+	HookEvent("round_end", EventRoundEnd);
 }
 
 public OnMapStart()
@@ -80,6 +80,7 @@ public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 		CreateTimer(60.0, ReSet, _, TIMER_FLAG_NO_MAPCHANGE);
 		InitFinished = true;
 	}
+	return Plugin_Handled;
 }
 
 public Action:ReSet(Handle:timer)
@@ -94,6 +95,14 @@ public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadc
 	IsWeekend = 0;
 	compareRate = 100.0;
 	ReadTxt();
+}
+
+public Action:EventRoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	InitFinished = false;
+	IsFestival = false;
+	IsWeekend = 0;
+	compareRate = 100.0;
 }
 
 public Action:Event_PlayerDisconnect(Handle:event, String:event_name[], bool:dontBroadcast)
@@ -506,4 +515,20 @@ stock CheatCommand(client, const String:command[], const String:arguments[])
 	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
 	FakeClientCommand(client, "%s %s", command, arguments );
 	SetCommandFlags(command, flags | FCVAR_CHEAT);
+}
+
+stock Array_FindString(const String:array[][], size, const String:str[], bool:caseSensitive=true, start=0)
+{
+	if (start < 0) {
+		start = 0;
+	}
+
+	for (new i=start; i < size; i++) {
+
+		if (StrEqual(array[i], str, caseSensitive)) {
+			return i;
+		}
+	}
+
+	return -1;
 }

@@ -5,14 +5,14 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <colors>
-#include <hint>
+//#include <hint>
 #include <left4dhooks>
-#include <smlib>
+//#include <smlib>
 
 #define DEBUG true
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.9.4.0"
+#define PLUGIN_VERSION "0.9.4.1"
 
 #define COUNTDOWN_ING_SOUND "buttons/blip1.wav"
 #define COUNTDOWN_ED_SOUND "buttons/blip2.wav"
@@ -25,7 +25,7 @@
 #define SurCount 16
 
 //虚函数
-new Handle:g_GameData;
+//new Handle:g_GameData;
 //开局计数相关
 new countDown = 0;
 new bool:isFirstRound;
@@ -146,18 +146,18 @@ public OnPluginStart()
 	{ 
 		SetFailState("Use this in Left 4 Dead 2 only.");
 	}
-	g_GameData = LoadGameConfigFile("linchpin");
-	if(g_GameData == null)
-    {
-    	SetFailState("Game data missing!");
-    }
+	// g_GameData = LoadGameConfigFile("linchpin");
+	// if(g_GameData == null)
+    // {
+    // 	SetFailState("Game data missing!");
+    // }
 	
 	//nextPrimaryAttackOffset = FindSendPropInfo("CBaseCombatWeapon","m_flNextPrimaryAttack");
 	//activeWeaponOffset = FindSendPropInfo("CBasePlayer", "m_hActiveWeapon");
 	
 	new Handle:hMaxSurvivorsLimitCvar = FindConVar("survivor_limit");
-	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Lower, true, 1.0);
-	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Upper, true, SurCount * 1.0);
+	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Lower, true, 4.0);
+	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Upper, true, 16.0);
 	SetConVarInt(hMaxSurvivorsLimitCvar, SurCount);
 	SetConVarInt(FindConVar("z_spawn_flow_limit"), 50000);
 
@@ -634,30 +634,33 @@ TakeOverBot(client, bool:completely)
 		PrintHintText(client, "没有BOT接管.");
 		return;
 	}
-	static Handle:hSetHumanIdle;
-	if (!hSetHumanIdle)
-	{
-		StartPrepSDKCall(SDKCall_Player);
-		PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
-		PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-		hSetHumanIdle = EndPrepSDKCall();
-	}
-	static Handle:hTakeOverBot;
-	if (!hTakeOverBot)
-	{
-		StartPrepSDKCall(SDKCall_Player);
-		PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
-		PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-		hTakeOverBot = EndPrepSDKCall();
-	}
+	// static Handle:hSetHumanIdle;
+	// if (!hSetHumanIdle)
+	// {
+	// 	StartPrepSDKCall(SDKCall_Player);
+	// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
+	// 	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	// 	hSetHumanIdle = EndPrepSDKCall();
+	// }
+	// static Handle:hTakeOverBot;
+	// if (!hTakeOverBot)
+	// {
+	// 	StartPrepSDKCall(SDKCall_Player);
+	// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
+	// 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+	// 	hTakeOverBot = EndPrepSDKCall();
+	// }
 	if (completely)
 	{
-		SDKCall(hSetHumanIdle, bot, client);
-		SDKCall(hTakeOverBot, client, true);
+		//SDKCall(hSetHumanIdle, bot, client);
+		//SDKCall(hTakeOverBot, client, true);
+		L4D_SetHumanSpec(bot, client);
+		L4D_TakeOverBot(client);
 	}
 	else
 	{
-		SDKCall(hSetHumanIdle, bot, client);
+		//SDKCall(hSetHumanIdle, bot, client);
+		L4D_SetHumanSpec(bot, client);
 		SetEntProp(client, Prop_Send, "m_iObserverMode", 5);
 	}
 	return;
@@ -729,12 +732,13 @@ SpawnFakeClient()
 
 public Action:TimerSpawnBot(Handle:timer)
 {
-	if (GetSurvivorCount(true) < SurCount+2)
+	new count = SurCount+2 - GetSurvivorCount(true);
+	for (new i=0; i<count; i++)
 	{
 		SpawnAFakeClient();
-		CreateTimer(0.2, TimerSpawnBot);
+		//CreateTimer(1, TimerSpawnBot);
 	}
-	return Plugin_Continue;
+	return Plugin_Handled;
 }
 
 SpawnAFakeClient()
@@ -875,7 +879,7 @@ public Action:ChooseAndSet(Handle:timer)
 			if (limit != INVALID_HANDLE)
 			{
 				SetConVarInt(limit, num);
-				//LogMessage("SetLimit:%d", num);
+				LogMessage("Set convar custom_survivor_count:%d", num);
 			}
 		}
 		PrintToChatAll("\x03当前选定:\x04%s\x03决定所有人血量, 请注意保护",survivorsName[index]);
@@ -1399,25 +1403,26 @@ public Action:Event_DefibrillatorUsed(Handle:event, String:event_name[], bool:do
 		new sur = GetADeathManInList();
 		if (sur > 0)
 		{
-			static Handle:hSetHumanIdle;
-			if (!hSetHumanIdle)
-			{
-				StartPrepSDKCall(SDKCall_Player);
-				PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
-				PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-				hSetHumanIdle = EndPrepSDKCall();
-			}
-			static Handle:hTakeOverBot;
-			if (!hTakeOverBot)
-			{
-				StartPrepSDKCall(SDKCall_Player);
-				PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
-				PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-				hTakeOverBot = EndPrepSDKCall();
-			}
-			SDKCall(hSetHumanIdle, client, sur);
-			SDKCall(hTakeOverBot, sur, true);
-			
+			// static Handle:hSetHumanIdle;
+			// if (!hSetHumanIdle)
+			// {
+			// 	StartPrepSDKCall(SDKCall_Player);
+			// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
+			// 	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+			// 	hSetHumanIdle = EndPrepSDKCall();
+			// }
+			// static Handle:hTakeOverBot;
+			// if (!hTakeOverBot)
+			// {
+			// 	StartPrepSDKCall(SDKCall_Player);
+			// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
+			// 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+			// 	hTakeOverBot = EndPrepSDKCall();
+			// }
+			// SDKCall(hSetHumanIdle, client, sur);
+			// SDKCall(hTakeOverBot, sur, true);
+			L4D_SetHumanSpec(client, sur);
+			L4D_TakeOverBot(sur);
 			new String:auth[MAX_STEAMAUTH_LENGTH];
 			if (IsClientAuthorized(sur))	
 			{
@@ -2743,5 +2748,20 @@ GetCurrentMapEx(String:map[],length)
 {
 	new String:old[length];
 	GetCurrentMap(old, length);
-	String_ToLower(old, map, length);
+	StringToLower(old, map, length);
+}
+
+StringToLower(const String:input[], String:output[], size)
+{
+	size--;
+
+	new x=0;
+	while (input[x] != '\0' && x < size) {
+
+		output[x] = CharToLower(input[x]);
+
+		x++;
+	}
+
+	output[x] = '\0';
 }

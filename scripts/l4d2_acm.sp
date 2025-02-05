@@ -294,7 +294,7 @@ public Action: CheckServerStartChange(Handle: timer)
 
 public Action:L4D_OnFirstSurvivorLeftSafeArea(int client)
 {
-    LogMessage("LeftSafeArea:%N", client);
+    //LogMessage("LeftSafeArea:%N", client);
     if(L4D_IsMissionFinalMap() && !called)
     {
 		called = true;
@@ -313,9 +313,10 @@ public Action:L4D_OnFirstSurvivorLeftSafeArea(int client)
 		// 	}
 		// }
 		TriggerRoundEnd();
-		PrintToChatAll("死了");
+		PrintToChatAll("防卡服，重启战役!");
 		LogMessage("restart on first map");
 	}
+	return Plugin_Continue;
 }
 
 public Action:Cmd_ChangeCustomMapState(client, args)
