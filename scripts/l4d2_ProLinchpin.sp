@@ -25,7 +25,7 @@
 #define SurCount 16
 
 //虚函数
-//new Handle:g_GameData;
+new Handle:g_GameData;
 //开局计数相关
 new countDown = 0;
 new bool:isFirstRound;
@@ -41,6 +41,7 @@ new bool:isPrinting;
 new bool:hasKilledAll;
 new bool:isRoundEnd;
 new bool:botDieFinished;
+new bool:botDieStarted;
 new bool:mapChange;
 new bool:saved;
 //血量同步
@@ -146,11 +147,11 @@ public OnPluginStart()
 	{ 
 		SetFailState("Use this in Left 4 Dead 2 only.");
 	}
-	// g_GameData = LoadGameConfigFile("linchpin");
-	// if(g_GameData == null)
-    // {
-    // 	SetFailState("Game data missing!");
-    // }
+	g_GameData = LoadGameConfigFile("linchpin");
+	if(g_GameData == null)
+    {
+    	SetFailState("Game data missing!");
+    }
 	
 	//nextPrimaryAttackOffset = FindSendPropInfo("CBaseCombatWeapon","m_flNextPrimaryAttack");
 	//activeWeaponOffset = FindSendPropInfo("CBasePlayer", "m_hActiveWeapon");
@@ -160,6 +161,8 @@ public OnPluginStart()
 	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Upper, true, 16.0);
 	SetConVarInt(hMaxSurvivorsLimitCvar, SurCount);
 	SetConVarInt(FindConVar("z_spawn_flow_limit"), 50000);
+
+	CreateConVar("l4d2_pl_death_linchpin_change", "1", "玩家死亡是否变更选定");
 
 	HookEvent("round_start", Event_RoundStart);
 	HookEvent("round_end", Event_RoundEnd);
@@ -178,7 +181,7 @@ public OnPluginStart()
 	HookEvent("weapon_fire", Event_WeaponFire);
 	
 	RegConsoleCmd("sm_join", Cmd_JoinSurvivor);
-	
+	RegAdminCmd("sm_sdc", Cmd_StopDeathChange, ADMFLAG_CHEATS);
 	//PreVomitSDKCall();
 	ConnectDB();
 	isLoading = true;
@@ -228,6 +231,15 @@ public Action:Cmd_JoinSurvivor(client, args)
 	else if (!IsCountDownFinished())
 	{
 		JoinTeam(client);
+	}
+}
+
+public Action:Cmd_StopDeathChange(client, args)
+{
+	if (IsClientInGame(client))
+	{
+		PrintToChat(client, "已关闭玩家死亡后选定玩家变动");
+		SetConVarInt(FindConVar("l4d2_pl_death_linchpin_change"), 0);
 	}
 }
 
@@ -382,6 +394,7 @@ RoundStart_InitGlobalVar()
 	isPreList = false;
 	isPrinting = false;
 	botDieFinished = false;
+	botDieStarted = false;
 	saved = false;
 	for (new i = 0; i < SurCount; i++)
 	{
@@ -634,33 +647,33 @@ TakeOverBot(client, bool:completely)
 		PrintHintText(client, "没有BOT接管.");
 		return;
 	}
-	// static Handle:hSetHumanIdle;
-	// if (!hSetHumanIdle)
-	// {
-	// 	StartPrepSDKCall(SDKCall_Player);
-	// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
-	// 	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-	// 	hSetHumanIdle = EndPrepSDKCall();
-	// }
-	// static Handle:hTakeOverBot;
-	// if (!hTakeOverBot)
-	// {
-	// 	StartPrepSDKCall(SDKCall_Player);
-	// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
-	// 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-	// 	hTakeOverBot = EndPrepSDKCall();
-	// }
+	static Handle:hSetHumanIdle;
+	if (!hSetHumanIdle)
+	{
+		StartPrepSDKCall(SDKCall_Player);
+		PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
+		PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+		hSetHumanIdle = EndPrepSDKCall();
+	}
+	static Handle:hTakeOverBot;
+	if (!hTakeOverBot)
+	{
+		StartPrepSDKCall(SDKCall_Player);
+		PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
+		PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+		hTakeOverBot = EndPrepSDKCall();
+	}
 	if (completely)
 	{
-		//SDKCall(hSetHumanIdle, bot, client);
-		//SDKCall(hTakeOverBot, client, true);
-		L4D_SetHumanSpec(bot, client);
-		L4D_TakeOverBot(client);
+		SDKCall(hSetHumanIdle, bot, client);
+		SDKCall(hTakeOverBot, client, true);
+		// L4D_SetHumanSpec(bot, client);
+		// L4D_TakeOverBot(client);
 	}
 	else
 	{
-		//SDKCall(hSetHumanIdle, bot, client);
-		L4D_SetHumanSpec(bot, client);
+		SDKCall(hSetHumanIdle, bot, client);
+		// L4D_SetHumanSpec(bot, client);
 		SetEntProp(client, Prop_Send, "m_iObserverMode", 5);
 	}
 	return;
@@ -775,8 +788,13 @@ public Action:Timer_KickFakeBot(Handle:timer, any:fakeclient)
 }
 
 public Action:StartInitReady(Handle:timer)
-{
-	FocusBotDie();
+{	
+	if (!botDieStarted) 
+	{
+		FocusBotDie();
+	}
+	botDieStarted = true;
+	
 	if (botDieFinished)
 	{
 		CreateTimer(1.0, InitFuction, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -801,13 +819,14 @@ FocusBotDie()
 			TeleportEntity(i, pos, NULL_VECTOR, NULL_VECTOR);
 			DeletePlayerAllSlot(i);
 			ForcePlayerSuicide(i);
-			CreateTimer(0.1, DeleteDeadBody);
+			RequestFrame(DeleteDeadBody, i);
 		}
 	}
+
 	botDieFinished = true;
 }
 
-public Action: DeleteDeadBody(Handle:timer)
+public void DeleteDeadBody(any:data)
 {
 	new entity = -1;
 	while ((entity = FindEntityByClassname(entity, "survivor_death_model")) != INVALID_ENT_REFERENCE)
@@ -818,7 +837,6 @@ public Action: DeleteDeadBody(Handle:timer)
 /*---处理开局选定---*/
 public Action:InitFuction(Handle:timer)
 {
-	KillAllFakeBot();
 	PreList();
 	CreateTimer(0.1, FirstSetLinchpin, _, TIMER_FLAG_NO_MAPCHANGE);
 }
@@ -868,7 +886,7 @@ public Action:ChooseAndSet(Handle:timer)
 	}
 	else
 	{
-		CreateTimer(0.1, CheckBot);
+		//CreateTimer(0.1, CheckBot);
 		new index = RandomIndex();
 		new client = FindClientBySteamId(survivorsList[index]);
 		if (client > 0)
@@ -1367,18 +1385,13 @@ public Action:TimerKickPlayer(Handle:timer,any:client)
 
 public Action:TimerKillAllAlivedFakeBot(Handle:timer)
 {
-	KillAllFakeBot();
-}
-
-KillAllFakeBot()
-{
-    for (new i = 1; i <= MaxClients; i++)
+	for (new i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && GetClientTeam(i) == 2 && IsFakeClient(i) && IsPlayerAlive(i))
 		{
 			DeletePlayerAllSlot(i);
 			ForcePlayerSuicide(i);
-			CreateTimer(0.1, DeleteDeadBody);
+			//CreateTimer(0.1, DeleteDeadBody);
 		}
 	}
 }
@@ -1403,26 +1416,26 @@ public Action:Event_DefibrillatorUsed(Handle:event, String:event_name[], bool:do
 		new sur = GetADeathManInList();
 		if (sur > 0)
 		{
-			// static Handle:hSetHumanIdle;
-			// if (!hSetHumanIdle)
-			// {
-			// 	StartPrepSDKCall(SDKCall_Player);
-			// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
-			// 	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-			// 	hSetHumanIdle = EndPrepSDKCall();
-			// }
-			// static Handle:hTakeOverBot;
-			// if (!hTakeOverBot)
-			// {
-			// 	StartPrepSDKCall(SDKCall_Player);
-			// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
-			// 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-			// 	hTakeOverBot = EndPrepSDKCall();
-			// }
-			// SDKCall(hSetHumanIdle, client, sur);
-			// SDKCall(hTakeOverBot, sur, true);
-			L4D_SetHumanSpec(client, sur);
-			L4D_TakeOverBot(sur);
+			static Handle:hSetHumanIdle;
+			if (!hSetHumanIdle)
+			{
+				StartPrepSDKCall(SDKCall_Player);
+				PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
+				PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+				hSetHumanIdle = EndPrepSDKCall();
+			}
+			static Handle:hTakeOverBot;
+			if (!hTakeOverBot)
+			{
+				StartPrepSDKCall(SDKCall_Player);
+				PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
+				PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+				hTakeOverBot = EndPrepSDKCall();
+			}
+			SDKCall(hSetHumanIdle, client, sur);
+			SDKCall(hTakeOverBot, sur, true);
+			//L4D_SetHumanSpec(client, sur);
+			//L4D_TakeOverBot(sur);
 			new String:auth[MAX_STEAMAUTH_LENGTH];
 			if (IsClientAuthorized(sur))	
 			{
@@ -1460,7 +1473,7 @@ public Action:Event_DefibrillatorUsed(Handle:event, String:event_name[], bool:do
 			ForcePlayerSuicide(client);
 		}
 	}
-	CreateTimer(1.0, CheckBot, _, TIMER_FLAG_NO_MAPCHANGE);
+	//CreateTimer(1.0, CheckBot, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
  GetADeathManInList()
@@ -1496,21 +1509,21 @@ bool:IsPlayerInSurList(client)
 	return false;
 }
 
-public Action:CheckBot(Handle:timer)
-{
-	for (new i = 1; i <= MaxClients; i++)
-	{
-		if (!IsClientConnected(i) || !IsClientInGame(i))
-		{
-			continue;
-		}
-		if (IsValidSurvivor(i, true) && IsAlive(i) && IsFakeClient(i))
-		{
-			ForcePlayerSuicide(i);
-		}
-	}
-	CreateTimer(0.1, DeleteDeadBody);
-}
+// public Action:CheckBot(Handle:timer)
+// {
+// 	for (new i = 1; i <= MaxClients; i++)
+// 	{
+// 		if (!IsClientConnected(i) || !IsClientInGame(i))
+// 		{
+// 			continue;
+// 		}
+// 		if (IsValidSurvivor(i, true) && IsAlive(i) && IsFakeClient(i))
+// 		{
+// 			ForcePlayerSuicide(i);
+// 		}
+// 		RequestFrame(DeleteDeadBody, i);
+// 	}
+// }
 
 public Action:Event_PlayerDeath(Handle:event, String:event_name[], bool:dontBroadcast)
 {
@@ -1540,27 +1553,35 @@ public Action:Event_PlayerDeath(Handle:event, String:event_name[], bool:dontBroa
 			{
 				survivorsStat[check] = 0;
 			}
-			new index = RandomIndex();
-			if (index == check)
+			new change = GetConVarInt(FindConVar("l4d2_pl_death_linchpin_change"));
+			if (change == 1)
 			{
-				KillAll();
-				PrintToChatAll("\x03玩家\x04%s\x03死亡, 选定玩家变更为\x04%s\x03(已死亡)", survivorsName[check], survivorsName[check]);
-			}
-			else
-			{
-				if (survivorsStat[index] == 1)
+				new index = RandomIndex();
+				if (index == check)
 				{
-					new chose = FindClientBySteamId(survivorsList[index]);
-					linchpin = chose;
-					SetSurGlowColor(linchpin);
-					PlayInfoSound();
-					PrintToChatAll("\x03玩家\x04%s\x03死亡, 选定玩家变更为\x04%s", survivorsName[check], survivorsName[index]);
+					KillAll();
+					PrintToChatAll("\x03玩家\x04%s\x03死亡, 选定玩家变更为\x04%s\x03(已死亡)", survivorsName[check], survivorsName[check]);
 				}
 				else
 				{
-					KillAll();
-					PrintToChatAll("\x03玩家\x04%s\x03死亡, 选定玩家变更为\x04%s\x03(已死亡)", survivorsName[check], survivorsName[index]);
+					if (survivorsStat[index] == 1)
+					{
+						new chose = FindClientBySteamId(survivorsList[index]);
+						linchpin = chose;
+						SetSurGlowColor(linchpin);
+						PlayInfoSound();
+						PrintToChatAll("\x03玩家\x04%s\x03死亡, 选定玩家变更为\x04%s", survivorsName[check], survivorsName[index]);
+					}
+					else
+					{
+						KillAll();
+						PrintToChatAll("\x03玩家\x04%s\x03死亡, 选定玩家变更为\x04%s\x03(已死亡)", survivorsName[check], survivorsName[index]);
+					}
 				}
+			}
+			else
+			{
+				PrintToChatAll("\x03玩家\x04%s\x03死亡, 选定玩家\x04不变", survivorsName[check]);
 			}
 		}
 	}

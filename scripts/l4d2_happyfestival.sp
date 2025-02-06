@@ -2,7 +2,7 @@
 #define DEBUG false
 
 #define PLUGIN_NAME           "l4d2_happyFestival"
-#define PLUGIN_AUTHOR         "mYui"
+#define PLUGIN_AUTHOR         "Yui"
 #define PLUGIN_DESCRIPTION    "Gives Infinite Ammo when festival"
 #define PLUGIN_VERSION        "1.4"
 #define PLUGIN_URL            "NA"
@@ -38,6 +38,7 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
+	CreateConVar("l4d2_hf_enable_generade", "0", "是否允许投掷物");
 	HookEvent("defibrillator_used", Event_DefibrillatorUsed);
 	HookEvent("heal_success", Event_HealSuccess);
 	HookEvent("adrenaline_used", Event_AdrenalineUsed);
@@ -47,12 +48,32 @@ public OnPluginStart()
 	HookEvent("player_disconnect", Event_PlayerDisconnect);
 	HookEvent("round_start", EventRoundStart);
 	HookEvent("round_end", EventRoundEnd);
+	RegAdminCmd("sm_hfg", Cmd_ChangeGenerade, ADMFLAG_CHEATS);
 }
 
 public OnMapStart()
 {
 	Allowed = 0;
 	FailedCount = 0.0;
+}
+
+public Action:Cmd_ChangeGenerade(client, args)
+{
+	if (IsClientInGame(client))
+	{
+		new Handle:cvar = FindConVar("l4d2_hf_enable_generade");
+		new allow = GetConVarInt(cvar);
+		if (allow == 1)
+		{
+			PrintToChat(client, "已关闭无限手榴弹");
+			SetConVarInt(cvar, 0);
+		}
+		else
+		{
+			PrintToChat(client, "已开启无限手榴弹");
+			SetConVarInt(cvar, 1);
+		}
+	}
 }
 
 public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
@@ -233,6 +254,8 @@ public Action:Event_WeaponFire(Handle:event, const String:name[], bool:dontBroad
 
 public Action:Event_WeaponDrop(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	new Handle:cvar = FindConVar("l4d2_hf_enable_generade");
+	new allow = GetConVarInt(cvar);
 	new String:weapon[64];
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	GetEventString(event, "item", weapon, sizeof(weapon));
@@ -244,20 +267,23 @@ public Action:Event_WeaponDrop(Handle:event, const String:name[], bool:dontBroad
 		    int needChange = 0;
 		    if (Throwing[client] == 1)
 			{
-				if (StrEqual(weapon, "pipe_bomb"))
+				if (allow == 1)
 				{
-					needChange = 1;
-					CheatCommand(client, "give", "pipe_bomb");
-				}
-				else if (StrEqual(weapon, "vomitjar"))
-				{
-					needChange = 1;
-					CheatCommand(client, "give", "vomitjar");
-				}
-				else if (StrEqual(weapon, "molotov"))
-				{
-					needChange = 1;
-					CheatCommand(client, "give", "molotov");
+					if (StrEqual(weapon, "pipe_bomb"))
+					{
+						needChange = 1;
+						CheatCommand(client, "give", "pipe_bomb");
+					}
+					else if (StrEqual(weapon, "vomitjar"))
+					{
+						needChange = 1;
+						CheatCommand(client, "give", "vomitjar");
+					}
+					else if (StrEqual(weapon, "molotov"))
+					{
+						needChange = 1;
+						CheatCommand(client, "give", "molotov");
+					}
 				}
 				Throwing[client] = 0;
 			}

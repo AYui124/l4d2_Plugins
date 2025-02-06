@@ -2,7 +2,7 @@
 
 #define PLUGIN_AUTHOR "Yui"
 #define PLUGIN_VERSION "0.3"
-#define Count 33
+#define Count 32
 
 #include <sourcemod>
 #include <sdktools>
@@ -11,7 +11,7 @@ static String:needClean_Scripts[Count][] =
 {
 	"weapon_spawn",
 	"weapon_ammo_spawn",
-	"weapon_melee_spawn",
+	//"weapon_melee_spawn",
 	"weapon_pistol_spawn",
 	"weapon_pistol_magnum_spawn",
 	"weapon_smg_spawn",
