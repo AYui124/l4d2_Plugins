@@ -47,7 +47,7 @@ public Action:NewFileCheck(Handle:timer)
 	new String:filePath[PLATFORM_MAX_PATH];
 	new String:buffer[PLATFORM_MAX_PATH];
 	
-	FormatTime(buffer, sizeof(buffer), "%Y-%m-%d");
+	FormatTime(buffer, sizeof(buffer), "%Y%m%d");
 	Format(filePath, sizeof(filePath), "%s/chatlog_%s.txt", folderPath, buffer);
 	
 	if (!FileExists(filePath))
@@ -110,7 +110,7 @@ public OnClientSayCommand_Post(client, const String:command[], const String:sArg
 		{
 			Format(stat, sizeof(stat), "%s", "");	// never be used
 		}
-		Format(buffer, sizeof(buffer), "%s ~ [%s] %s", time, stat, name);
+		Format(buffer, sizeof(buffer), "%s [%s]:%s", time, stat, name);
 	}
 	else
 	{
@@ -149,7 +149,7 @@ public Action:Event_ChangeName(Handle:event, String:event_name[], bool:dontBroad
 		WriteFileLine(file, buf);
 		FlushFile(file);
 	}
-	Format(buf, sizeof(buf), "%s ~ %s 更名为 %s%s", time, oldName, newName, "");
+	Format(buf, sizeof(buf), "%s %s 更名为 %s%s", time, oldName, newName, "");
 	WriteFileLine(file, buf);
 	FlushFile(file);
 }

@@ -3,7 +3,7 @@
 #define DEBUG
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "1.6"
+#define PLUGIN_VERSION "1.7.1"
 
 //pz constants (for SI type checking)
 #define IS_SMOKER	1
@@ -26,6 +26,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
+#include <left4dhooks>
 
 new siCount;
 new siLimit;
@@ -93,26 +94,22 @@ public void OnPluginStart()
 	handleMusicEnable = CreateConVar("l4d_is_music_enable", "1", "允许播放音乐，音乐播放时仅生成一种特感");
 	handleMusicSpawnInterval = CreateConVar("l4d_is_music_spawn_interval", "1.0", "播放音乐时的特感生成间隔");
 	handleMusicRate = CreateConVar("l4d_is_music_rate", "1", "允许播放音乐的几率(每20波特感)");
-	//AutoExecConfig(true, "l4d2_InfectedSpawn");
+	// AutoExecConfig(true, "l4d2_InfectedSpawn");
 	handleSpawnEnabled = CreateConVar("l4d_is_spawn_enabled", "1", "是否生成特感");
-	handleSurvivorCount = CreateConVar("custom_survivor_count", "1", "幸存者人数(决定特感上限)");
+	handleSurvivorCount = CreateConVar("custom_survivor_count", "0", "幸存者人数(决定特感上限)");
 
 	CreateConVar("tank_rate_up", "0", "", FCVAR_DONTRECORD);
 	
-	SetConVarInt(FindConVar("z_smoker_limit"), 0);
-	SetConVarInt(FindConVar("z_boomer_limit"), 0);
-	SetConVarInt(FindConVar("z_hunter_limit"), 0);
-	SetConVarInt(FindConVar("z_spitter_limit"), 0);
-	SetConVarInt(FindConVar("z_jockey_limit"), 0);
-	SetConVarInt(FindConVar("z_charger_limit"), 0);
-	//SetConVarInt(FindConVar("z_attack_flow_range"), 50000);
-	SetConVarInt(FindConVar("z_spawn_range"), 800);
-	SetConVarInt(FindConVar("z_spawn_safety_range"), 400);
-	SetConVarInt(FindConVar("z_cooldown_spawn_safety_range"), 500);
-	SetConVarInt(FindConVar("z_finale_spawn_safety_range"), 400);
-	SetConVarInt(FindConVar("director_no_specials"), 1);
-	//SetConVarInt(FindConVar("z_spawn_flow_limit"), 50000);
-	
+	// SetConVarInt(FindConVar("z_smoker_limit"), 0);
+	// SetConVarInt(FindConVar("z_boomer_limit"), 0);
+	// SetConVarInt(FindConVar("z_hunter_limit"), 0);
+	// SetConVarInt(FindConVar("z_spitter_limit"), 0);
+	// SetConVarInt(FindConVar("z_jockey_limit"), 0);
+	// SetConVarInt(FindConVar("z_charger_limit"), 0);
+	SetConVarInt(FindConVar("director_no_specials"), 0);
+	// SetConVarInt(FindConVar("director_no_bosses"), 0);
+
+	SetConVarInt(FindConVar("z_spawn_safety_range"), 350);
 	HookEvents();
 }
 
@@ -121,11 +118,12 @@ HookEvents()
 	HookEvent("round_start", EventRoundStart, EventHookMode_Post);
 	HookEvent("round_end", EventRoundEnd, EventHookMode_Pre);
 	HookEvent("map_transition", EventRoundEnd, EventHookMode_Pre);
-	HookEvent("tank_spawn", EventTankSpawn);
+	HookEvent("tank_spawn", EventTankSpawn, EventHookMode_Post);
 }
 
 public OnMapStart()
 {
+	leftSafeRoom = false;
 	PrecacheModel("models/infected/witch.mdl");
 	PrecacheModel("models/infected/witch_bride.mdl");
 	PrecacheSound( RELATIVE_SOUND_PATH[0]);
@@ -144,9 +142,12 @@ public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 {
 	if (!leftSafeRoom)
 	{
+		if ((client < 1) || (client > MaxClients) || !IsClientInGame(client) || IsFakeClient(client))
+			return Plugin_Continue;
 		leftSafeRoom = true;
 		StartSpawnTimer();
 	}
+	return Plugin_Continue;
 }
 
 StartSpawnTimer()
@@ -160,7 +161,7 @@ StartSpawnTimer()
 	}
 	else
 	{
-		siLimit = GetSurvivorCount(false);
+		siLimit = GetSurvivorCount(true);
 	}
 
 	if (musicPlaying)
@@ -177,7 +178,7 @@ StartSpawnTimer()
 		new Float:max = GetConVarFloat(handleSpawnTimeMin);
 		time = GetRandomFloat(min, max);
 	}
-	//LogMessage("SpawnTimer surCount=%d,silimit=%d,time=%f", survivorCount, siLimit, time);
+	//LogMessage("SpawnTimer survivorCount=%d,siLimit=%d,siCount=%d,time=%f", survivorCount, siLimit, siCount,time);
 	CreateTimer(time, SpawnInfectedAuto);
 }
 
@@ -212,7 +213,7 @@ CalucateSiLimit()
 	new survivorCount = GetConVarInt(handleSurvivorCount);
 	if(survivorCount <= 0)
 	{
-		return GetSurvivorCount(false);
+		return GetSurvivorCount(true);
 	}
 	else if(survivorCount <= 1)
 	{
@@ -248,14 +249,15 @@ GetSurvivorCount(bool:allowBots)
 }
 
 public Action:SpawnInfectedAuto(Handle:timer)
-{
+{	
 	new spawnTimerEnabled = GetConVarInt(handleSpawnEnabled);
 	if(spawnTimerEnabled == 0)
-	{
-		//LogMessage("Wait 5 sec: Not Enabled");
+	{	
+		//LogMessage("SpawnInfectedAuto spawnTimerEnabled=%d, wait...", spawnTimerEnabled);
 		StartCustomSpawnTimer(5.0);
 		return Plugin_Continue;
 	}
+
 	if (leftSafeRoom) //only spawn infected and repeat spawn timer when survivors have left safe room
 	{
 		new client = GetAnyClient();
@@ -267,7 +269,7 @@ public Action:SpawnInfectedAuto(Handle:timer)
 		else
 		{
 			//longer timer for when invalid client was returned (prevent a potential infinite loop when there are 0 SI)
-			//LogMessage("Wait 5 sec: No valid client");
+			//LogMessage("SpawnInfectedAuto not client, wait...");
 			StartCustomSpawnTimer(5.0);
 		}
 	}
@@ -275,6 +277,7 @@ public Action:SpawnInfectedAuto(Handle:timer)
 	{
 		//LogMessage("Wait 5 sec: Not leave saferoom");
 		StartCustomSpawnTimer(5.0);
+		//LogMessage("SpawnInfectedAuto not leftSafeRoom, wait...");
 	}
 	if (musicPlaying == false)
 	{
@@ -322,21 +325,60 @@ GenerateSpawn(client)
 			spawnQueue[i]= index;
 			spawnCounts[index] += 1;
 		}
-		
+		//LogMessage("GenerateSpawn queue finished");
 		for (new i = 0; i < 28; i++)
 		{
 			if(spawnQueue[i] < 0) //stops if the current array index is out of bound
 				break;
-			new bot = CreateFakeClient("Infected Bot");
-			if (bot != 0)
+			//LogMessage("GenerateSpawn type=%d", spawnQueue[i]);
+			if(!L4dHookSpawnSpecial(client, spawnQueue[i]))
 			{
-				ChangeClientTeam(bot, 3);
-				CreateTimer(0.1, KickBot, bot);
+				ZspawnSpecial(client, spawnQueue[i]);
+				//LogMessage("GenerateSpawn L4dHookSpawnSpecial failed");
 			}
-			CheatCommand(client, "z_spawn_old", spawns[spawnQueue[i]]); 
 			firstSpawn = false;
-		
 		}
+	}
+}
+
+ZspawnSpecial(any: client, any: type)
+{
+	new bot = CreateFakeClient("Infected Bot");
+	if (bot != 0)
+	{
+		ChangeClientTeam(bot, 3);
+		CreateTimer(0.1, KickBot, bot);
+	}
+	CheatCommand(client, "z_spawn_old", spawns[type]); 
+}
+
+bool:L4dHookSpawnSpecial(any: client, any: type)
+{
+	new Float:vPos[3];
+	new class = type == SI_TANK ? type + 2 : type + 1;
+    
+	if (!L4D_GetRandomPZSpawnPosition(client, class, 100, vPos))
+	{
+		//LogMessage("Couldn't find a valid spawn position in 20 tries");
+		return false;
+	}
+	if (class == IS_TANK)
+	{
+		new bool:tank = L4D2_SpawnTank(vPos, NULL_VECTOR) > 0;
+		if (!tank)
+		{
+			//LogMessage("L4D2_SpawnTank failed");
+		}
+		return tank;
+	} 
+	else 
+	{
+		new bool:special = L4D2_SpawnSpecial(class, vPos, NULL_VECTOR) > 0;
+		if (!special)
+		{
+			//LogMessage("L4D2_SpawnSpecial failed");
+		}
+		return special;
 	}
 }
 
@@ -445,18 +487,18 @@ GenerateIndex()
 public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {	
 	//and we reset some variables
-	SetConVarInt(handleSpawnEnabled, 0);
+	//SetConVarInt(handleSpawnEnabled, 0);
 	leftSafeRoom = false;
 	musicTimeCount = 0;
 	musicPlaying = false;
 	infectType = 0;
 	firstSpawn = true;
-	CreateTimer(60.0, FixNoSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
+	//CreateTimer(60.0, FixNoSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action:FixNoSpawn(Handle:timer)
 {
-	leftSafeRoom = true;
+	//leftSafeRoom = true;
 	SetConVarInt(handleSpawnEnabled, 1);
 }
 
@@ -482,22 +524,7 @@ public Action:LeaveStasis(Handle:timer, any:client)
 	if ((client < 1) || (client > MaxClients) || !IsClientInGame(client) || !IsFakeClient(client))
 		return;
 	//LogMessage("Call DealDamage:%d", client);
-	DealDamage(client, 0, GetRandomSurvivor(), DMG_BULLET, "weapon_rifle_ak47");
-}
-
-public int GetRandomSurvivor() 
-{
-	int survivors[MAXPLAYERS];
-	int numSurvivors = 0;
-	for( int i = 0; i < MAXPLAYERS; i++ )
-	{
-		if(IsValidSurvivor(i,true) && IsPlayerAlive(i)) 
-		{
-		    survivors[numSurvivors] = i;
-		    numSurvivors++;
-		}
-	}
-	return survivors[GetRandomInt(0, numSurvivors - 1)];
+	DealDamage(client, 0, GetRandomSurvivor(1, 0), DMG_BULLET, "weapon_rifle_ak47");
 }
 
 DealDamage(int victim, int damage, int attacker = 0, int dmg_type = DMG_GENERIC, char[] weapon = "")

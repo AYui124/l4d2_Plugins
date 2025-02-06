@@ -23,6 +23,7 @@ new String:nextMap[256];
 new String:nextName[256];
 new bool:hasCalled;
 new bool:called;
+new bool:firstChanged;
 
 public Plugin myinfo = 
 {
@@ -46,7 +47,8 @@ public void OnPluginStart()
 	b_OnlyOfficial = GetConVarInt(h_OnlyOfficial);
 	h_VoteEnabled = CreateConVar("rcm_VoteEnabled", "1", "是否允许投票");
 	b_VoteEnabled = GetConVarInt(h_VoteEnabled);
-
+	
+	firstChanged = false;
 }
 
 public Action:Cmd_MapVote(client, args)
@@ -273,14 +275,48 @@ public MapVoteHandler(Handle:menu, MenuAction:action, client, param2)
 
 public void OnMapStart()
 {
-	decl String:currentMap[256];
-	GetCurrentMap(currentMap, sizeof(currentMap));
-	if(StrEqual(currentMap,"credits"))
+	CreateTimer(2.0, CheckServerStartChange, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action: CheckServerStartChange(Handle: timer)
+{
+    decl String:currentMap[256];
+    GetCurrentMap(currentMap, sizeof(currentMap));
+	
+    if(StrEqual(currentMap, "credits"))
 	{
-		ReadMap();
-		LogMessage("map change:%s->%s", "credits", nextMap);
-		ServerCommand("changelevel %s", nextMap);
+		//ReadMap();
+		//LogMessage("map change:%s->%s", "credits", nextMap);
+		firstChanged = true;
+		ServerCommand("changelevel %s", "c2m1_highway");
 	}
+}
+
+public Action:L4D_OnFirstSurvivorLeftSafeArea(int client)
+{
+    //LogMessage("LeftSafeArea:%N", client);
+    if(L4D_IsMissionFinalMap() && !called)
+    {
+		called = true;
+		nextMap = "";
+		nextName = "";
+		CreateTimer(1.0, RandomMap);
+    }
+    if (firstChanged)
+	{
+		firstChanged = false;
+		// for (new i = 1; i <= MaxClients; i++)
+		// {
+		// 	if (IsClientInGame(i) && GetClientTeam(i) == 2 && !IsFakeClient(i) && IsPlayerAlive(i))
+		// 	{
+		// 		ForcePlayerSuicide(i);
+		// 	}
+		// }
+		TriggerRoundEnd();
+		PrintToChatAll("防卡服，重启战役!");
+		LogMessage("restart on first map");
+	}
+	return Plugin_Continue;
 }
 
 public Action:Cmd_ChangeCustomMapState(client, args)
@@ -297,18 +333,6 @@ public Action:Cmd_ChangeCustomMapState(client, args)
 		b_OnlyOfficial = 0;
 		SetConVarInt(h_OnlyOfficial, 0);
 	}
-}
-
-public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
-{
-	LogMessage("LeftSafeArea:%N", client);
-	if(L4D_IsMissionFinalMap() && !called)
-    {
-		called = true;
-		nextMap = "";
-		nextName = "";
-		CreateTimer(1.0, RandomMap);
-    }
 }
 
 public Action:RandomMap(Handle:timer)
@@ -411,4 +435,13 @@ ReadMap()
 GetRandomNum(max)
 {
 	return GetRandomInt(1, max);
+}
+
+TriggerRoundEnd()
+{
+	new flags = GetCommandFlags("scenario_end");
+	SetCommandFlags("scenario_end", flags & ~(FCVAR_CHEAT | FCVAR_DEVELOPMENTONLY));
+	ServerCommand("scenario_end");
+	ServerExecute();
+	SetCommandFlags("scenario_end", flags);
 }

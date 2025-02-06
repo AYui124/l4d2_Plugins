@@ -5,14 +5,14 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <colors>
-#include <hint>
+//#include <hint>
 #include <left4dhooks>
-#include <smlib>
+//#include <smlib>
 
 #define DEBUG true
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.9.4.0"
+#define PLUGIN_VERSION "0.9.4.1"
 
 #define COUNTDOWN_ING_SOUND "buttons/blip1.wav"
 #define COUNTDOWN_ED_SOUND "buttons/blip2.wav"
@@ -25,7 +25,7 @@
 #define SurCount 16
 
 //虚函数
-new Handle:g_GameData;
+//new Handle:g_GameData;
 //开局计数相关
 new countDown = 0;
 new bool:isFirstRound;
@@ -55,12 +55,12 @@ new lastCola;
 colaC[20000];
 //近战速度
 new bool:isLoading;
-new nextPrimaryAttackOffset = -1;
-new activeWeaponOffset;
-new Float:meleeAttackNextTimeFlame = -1.0;
-new meleeAttackMeleeEnt = -1;
-new meleeAttackNotMeleeEnt = -1;
-new meleeAttackCount = -1;
+// new nextPrimaryAttackOffset = -1;
+// new activeWeaponOffset;
+// new Float:meleeAttackNextTimeFlame = -1.0;
+// new meleeAttackMeleeEnt = -1;
+// new meleeAttackNotMeleeEnt = -1;
+// new meleeAttackCount = -1;
 //witch发光
 new fCount;
 new witchColor[20000];
@@ -85,7 +85,7 @@ new Float:vecX;
 new Float:vecY;
 new Handle:t_HitBack;
 //model fix
-new MODEL_DEFIB;
+//new MODEL_DEFIB;
 
 static String:randomScripts[30][] =
 {
@@ -146,18 +146,18 @@ public OnPluginStart()
 	{ 
 		SetFailState("Use this in Left 4 Dead 2 only.");
 	}
-	g_GameData = LoadGameConfigFile("linchpin");
-	if(g_GameData == null)
-    {
-    	SetFailState("Game data missing!");
-    }
+	// g_GameData = LoadGameConfigFile("linchpin");
+	// if(g_GameData == null)
+    // {
+    // 	SetFailState("Game data missing!");
+    // }
 	
-	nextPrimaryAttackOffset = FindSendPropInfo("CBaseCombatWeapon","m_flNextPrimaryAttack");
-	activeWeaponOffset = FindSendPropInfo("CBasePlayer", "m_hActiveWeapon");
+	//nextPrimaryAttackOffset = FindSendPropInfo("CBaseCombatWeapon","m_flNextPrimaryAttack");
+	//activeWeaponOffset = FindSendPropInfo("CBasePlayer", "m_hActiveWeapon");
 	
 	new Handle:hMaxSurvivorsLimitCvar = FindConVar("survivor_limit");
-	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Lower, true, 1.0);
-	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Upper, true, SurCount * 1.0);
+	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Lower, true, 4.0);
+	SetConVarBounds(hMaxSurvivorsLimitCvar, ConVarBound_Upper, true, 16.0);
 	SetConVarInt(hMaxSurvivorsLimitCvar, SurCount);
 	SetConVarInt(FindConVar("z_spawn_flow_limit"), 50000);
 
@@ -245,7 +245,7 @@ public OnMapStart()
 	PrecacheSound(COUNTDOWN_ED_SOUND,true);
 	PrecacheSound(INFO_NOTLCP_SOUND,true);
 	PrecacheSound(INFO_LCP_SOUND,true);
-	MODEL_DEFIB = PrecacheModel("models/w_models/weapons/w_eq_defibrillator.mdl", true);
+	PrecacheModel("models/w_models/weapons/w_eq_defibrillator.mdl", true);
 	CreateTimer(5.0, SQL_MapStartConnect, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -500,7 +500,12 @@ public Action:TimerCountDown(Handle:timer)
 		EmitSoundToAll(COUNTDOWN_ING_SOUND);
 		PrintHintTextToAll("请等待 %i 秒", ((isFirstRound ? 45:15) - countDown));
 		countDown += 1;
-		CreateTimer(1.0, TimerCountDown, _, TIMER_FLAG_NO_MAPCHANGE);
+		if (!isRoundEnd)
+		{
+			// 防止倒计时结束前团灭导致重复计时
+            CreateTimer(1.0, TimerCountDown, _, TIMER_FLAG_NO_MAPCHANGE);
+		}
+		
 	}
 	return Plugin_Continue;
 }
@@ -629,30 +634,33 @@ TakeOverBot(client, bool:completely)
 		PrintHintText(client, "没有BOT接管.");
 		return;
 	}
-	static Handle:hSetHumanIdle;
-	if (!hSetHumanIdle)
-	{
-		StartPrepSDKCall(SDKCall_Player);
-		PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
-		PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-		hSetHumanIdle = EndPrepSDKCall();
-	}
-	static Handle:hTakeOverBot;
-	if (!hTakeOverBot)
-	{
-		StartPrepSDKCall(SDKCall_Player);
-		PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
-		PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-		hTakeOverBot = EndPrepSDKCall();
-	}
+	// static Handle:hSetHumanIdle;
+	// if (!hSetHumanIdle)
+	// {
+	// 	StartPrepSDKCall(SDKCall_Player);
+	// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
+	// 	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+	// 	hSetHumanIdle = EndPrepSDKCall();
+	// }
+	// static Handle:hTakeOverBot;
+	// if (!hTakeOverBot)
+	// {
+	// 	StartPrepSDKCall(SDKCall_Player);
+	// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
+	// 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+	// 	hTakeOverBot = EndPrepSDKCall();
+	// }
 	if (completely)
 	{
-		SDKCall(hSetHumanIdle, bot, client);
-		SDKCall(hTakeOverBot, client, true);
+		//SDKCall(hSetHumanIdle, bot, client);
+		//SDKCall(hTakeOverBot, client, true);
+		L4D_SetHumanSpec(bot, client);
+		L4D_TakeOverBot(client);
 	}
 	else
 	{
-		SDKCall(hSetHumanIdle, bot, client);
+		//SDKCall(hSetHumanIdle, bot, client);
+		L4D_SetHumanSpec(bot, client);
 		SetEntProp(client, Prop_Send, "m_iObserverMode", 5);
 	}
 	return;
@@ -724,12 +732,13 @@ SpawnFakeClient()
 
 public Action:TimerSpawnBot(Handle:timer)
 {
-	if (GetSurvivorCount(true) < SurCount+2)
+	new count = SurCount+2 - GetSurvivorCount(true);
+	for (new i=0; i<count; i++)
 	{
 		SpawnAFakeClient();
-		CreateTimer(0.2, TimerSpawnBot);
+		//CreateTimer(1, TimerSpawnBot);
 	}
-	return Plugin_Continue;
+	return Plugin_Handled;
 }
 
 SpawnAFakeClient()
@@ -809,6 +818,7 @@ public Action: DeleteDeadBody(Handle:timer)
 /*---处理开局选定---*/
 public Action:InitFuction(Handle:timer)
 {
+	KillAllFakeBot();
 	PreList();
 	CreateTimer(0.1, FirstSetLinchpin, _, TIMER_FLAG_NO_MAPCHANGE);
 }
@@ -852,11 +862,6 @@ public Action:FirstSetLinchpin(Handle:timer)
 
 public Action:ChooseAndSet(Handle:timer)
 {
-	if (num == 0)
-	{
-		KillAll();
-		return Plugin_Continue;
-	}
 	if (isPrinting)
 	{
 		CreateTimer(0.1, ChooseAndSet, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -874,7 +879,7 @@ public Action:ChooseAndSet(Handle:timer)
 			if (limit != INVALID_HANDLE)
 			{
 				SetConVarInt(limit, num);
-				//LogMessage("SetLimit:%d", num);
+				LogMessage("Set convar custom_survivor_count:%d", num);
 			}
 		}
 		PrintToChatAll("\x03当前选定:\x04%s\x03决定所有人血量, 请注意保护",survivorsName[index]);
@@ -976,10 +981,10 @@ PrintList()
 {
 	isPrinting = true;
 	PrintToChatAll("\x03当前更新范围:\x04%i\x03人",num);
-	for (new i = 0; i < SurCount; i++)
-	{
-		PrintToChatAll("\x01%s",survivorsName[i]);
-	}
+	// for (new i = 0; i < SurCount; i++)
+	// {
+	// 	PrintToChatAll("\x01%s",survivorsName[i]);
+	// }
 	isPrinting = false;
 }
 
@@ -1175,64 +1180,64 @@ public OnGameFrame()
 	}
 }
 
-MeleeAttack_OnGameFrame()
-{
-	if (linchpin < 1)
-		return;
+// MeleeAttack_OnGameFrame()
+// {
+// 	if (linchpin < 1)
+// 		return;
 		
-	decl index;
-	decl meleeEntID;
-	decl Float:flNextTime_calc;
-	decl Float:flNextTime_ret;
-	new Float:flGameTime=GetGameTime();
-	index = linchpin;
-	if (index <= 0)
-		return;
-	if(!IsClientInGame(index))
-		return;
-	if(!IsClientConnected(index))
-		return;
-	if (!IsPlayerAlive(index))
-		return;
-	if(GetClientTeam(index) != 2)
-		return;
-	meleeEntID = GetEntDataEnt2(index,activeWeaponOffset);
-	if (meleeEntID == -1)
-		return;
-	flNextTime_ret = GetEntDataFloat(meleeEntID, nextPrimaryAttackOffset);
-	if (meleeEntID == meleeAttackNotMeleeEnt)
-	{
-		return;
-	}
-	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackCount != 0 && (flGameTime - flNextTime_ret) > 1.0)
-	{
-		meleeAttackCount = 0;
-	}
-	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackNextTimeFlame >= flNextTime_ret)
-	{
-		return;
-	}
-	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackNextTimeFlame < flNextTime_ret)
-	{
-		flNextTime_calc = flGameTime + 0.49;
-		meleeAttackNextTimeFlame  = flNextTime_calc;
-		SetEntDataFloat(meleeEntID, nextPrimaryAttackOffset, flNextTime_calc, true);
-		return;
-	}
-	decl String:stName[32];
-	GetEntityNetClass(meleeEntID,stName,32);
-	if (StrEqual(stName, "CTerrorMeleeWeapon", false) == true)
-	{
-		meleeAttackMeleeEnt = meleeEntID;
-		meleeAttackNextTimeFlame = flNextTime_ret;
-		return;
-	}
-	else
-	{
-		meleeAttackNotMeleeEnt = meleeEntID;
-		return;
-	}
-}
+// 	decl index;
+// 	decl meleeEntID;
+// 	decl Float:flNextTime_calc;
+// 	decl Float:flNextTime_ret;
+// 	new Float:flGameTime=GetGameTime();
+// 	index = linchpin;
+// 	if (index <= 0)
+// 		return;
+// 	if(!IsClientInGame(index))
+// 		return;
+// 	if(!IsClientConnected(index))
+// 		return;
+// 	if (!IsPlayerAlive(index))
+// 		return;
+// 	if(GetClientTeam(index) != 2)
+// 		return;
+// 	meleeEntID = GetEntDataEnt2(index,activeWeaponOffset);
+// 	if (meleeEntID == -1)
+// 		return;
+// 	flNextTime_ret = GetEntDataFloat(meleeEntID, nextPrimaryAttackOffset);
+// 	if (meleeEntID == meleeAttackNotMeleeEnt)
+// 	{
+// 		return;
+// 	}
+// 	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackCount != 0 && (flGameTime - flNextTime_ret) > 1.0)
+// 	{
+// 		meleeAttackCount = 0;
+// 	}
+// 	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackNextTimeFlame >= flNextTime_ret)
+// 	{
+// 		return;
+// 	}
+// 	if (meleeAttackMeleeEnt == meleeEntID && meleeAttackNextTimeFlame < flNextTime_ret)
+// 	{
+// 		flNextTime_calc = flGameTime + 0.49;
+// 		meleeAttackNextTimeFlame  = flNextTime_calc;
+// 		SetEntDataFloat(meleeEntID, nextPrimaryAttackOffset, flNextTime_calc, true);
+// 		return;
+// 	}
+// 	decl String:stName[32];
+// 	GetEntityNetClass(meleeEntID,stName,32);
+// 	if (StrEqual(stName, "CTerrorMeleeWeapon", false) == true)
+// 	{
+// 		meleeAttackMeleeEnt = meleeEntID;
+// 		meleeAttackNextTimeFlame = flNextTime_ret;
+// 		return;
+// 	}
+// 	else
+// 	{
+// 		meleeAttackNotMeleeEnt = meleeEntID;
+// 		return;
+// 	}
+// }
 
 GlowWitch_OnGameFrame()
 {
@@ -1362,7 +1367,12 @@ public Action:TimerKickPlayer(Handle:timer,any:client)
 
 public Action:TimerKillAllAlivedFakeBot(Handle:timer)
 {
-	for (new i = 1; i <= MaxClients; i++)
+	KillAllFakeBot();
+}
+
+KillAllFakeBot()
+{
+    for (new i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && GetClientTeam(i) == 2 && IsFakeClient(i) && IsPlayerAlive(i))
 		{
@@ -1393,25 +1403,26 @@ public Action:Event_DefibrillatorUsed(Handle:event, String:event_name[], bool:do
 		new sur = GetADeathManInList();
 		if (sur > 0)
 		{
-			static Handle:hSetHumanIdle;
-			if (!hSetHumanIdle)
-			{
-				StartPrepSDKCall(SDKCall_Player);
-				PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
-				PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
-				hSetHumanIdle = EndPrepSDKCall();
-			}
-			static Handle:hTakeOverBot;
-			if (!hTakeOverBot)
-			{
-				StartPrepSDKCall(SDKCall_Player);
-				PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
-				PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-				hTakeOverBot = EndPrepSDKCall();
-			}
-			SDKCall(hSetHumanIdle, client, sur);
-			SDKCall(hTakeOverBot, sur, true);
-			
+			// static Handle:hSetHumanIdle;
+			// if (!hSetHumanIdle)
+			// {
+			// 	StartPrepSDKCall(SDKCall_Player);
+			// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "SetHumanIdle");
+			// 	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer);
+			// 	hSetHumanIdle = EndPrepSDKCall();
+			// }
+			// static Handle:hTakeOverBot;
+			// if (!hTakeOverBot)
+			// {
+			// 	StartPrepSDKCall(SDKCall_Player);
+			// 	PrepSDKCall_SetFromConf(g_GameData, SDKConf_Signature, "TakeOverBot");
+			// 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+			// 	hTakeOverBot = EndPrepSDKCall();
+			// }
+			// SDKCall(hSetHumanIdle, client, sur);
+			// SDKCall(hTakeOverBot, sur, true);
+			L4D_SetHumanSpec(client, sur);
+			L4D_TakeOverBot(sur);
 			new String:auth[MAX_STEAMAUTH_LENGTH];
 			if (IsClientAuthorized(sur))	
 			{
@@ -1691,25 +1702,32 @@ public Action:SIOnTraceAttack(victim, &attacker, &inflictor, &Float:damage, &dam
 	}
 	if (StrEqual(cName, "weapon_melee", false))
 	{
-		//damage *= GetRandomFloat(0.1, 0.8);
-		//PrintHintText(attacker, "%d", damage);
-		//return Plugin_Changed;
-		
 		if (GetEntProp(victim, Prop_Send, "m_zombieClass") == 8)	// 是tank
 		{
-			damage = GetRandomFloat(0.1, 100.0);					// 修改伤害为0.1-100
+			if (attacker == linchpin) 
+			{
+                damage *= 2.0;										// 翻倍
+			}
+			else
+			{
+				damage = GetRandomFloat(0.1, 50.0);				// 修改伤害为0.1-50
+			}
 		}
 		else
 		{
-			damage *= GetRandomFloat(0.3, 0.7);
+			if (attacker == linchpin) 
+			{
+                //不调整
+			}
+			else
+			{
+				damage *= GetRandomFloat(0.1, 0.5);
+			}
 		}
-		//PrintHintText(attacker, "");
-		return Plugin_Changed;
 	}
 	else if (StrEqual(cName, "weapon_chainsaw", false))
 	{
-		damage *= GetRandomFloat(0.7, 1.0);
-		return Plugin_Changed;
+		damage *= GetRandomFloat(0.1, 1.0);
 	}
 	return Plugin_Changed;
 }
@@ -2571,9 +2589,12 @@ GiveItemFromSlotInfo()
 				if (weaponUpgrade[i] > 0)
 				{
 					new gun = GetPlayerWeaponSlot(client, 0);
-					new clipSize = GetEntProp(gun, Prop_Send, "m_iClip1", 4);
-					SetEntProp(gun, Prop_Send, "m_upgradeBitVec", weaponUpgrade[i], 4);
-					SetEntProp(gun, Prop_Send, "m_nUpgradedPrimaryAmmoLoaded", clipSize, 4);
+					if (gun > 0)
+					{
+						new clipSize = GetEntProp(gun, Prop_Send, "m_iClip1", 4);
+						SetEntProp(gun, Prop_Send, "m_upgradeBitVec", weaponUpgrade[i], 4);
+						SetEntProp(gun, Prop_Send, "m_nUpgradedPrimaryAmmoLoaded", clipSize, 4);
+					}
 				}
 			}
 			if (!StrEqual(slot2[i], "", false))
@@ -2684,48 +2705,63 @@ GiveCommand(client, const String:command[], const String:argument1[], const Stri
     SetUserFlagBits(client, admindata);
 }
 
-GetVictim(client)
-{
-    new victim = 0;
-    /* Charger */
-    victim = GetEntPropEnt(client, Prop_Send, "m_pummelVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
-    victim = GetEntPropEnt(client, Prop_Send, "m_carryVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
+// GetVictim(client)
+// {
+//     new victim = 0;
+//     /* Charger */
+//     victim = GetEntPropEnt(client, Prop_Send, "m_pummelVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
+//     victim = GetEntPropEnt(client, Prop_Send, "m_carryVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
 
-    /* Hunter */
-    victim = GetEntPropEnt(client, Prop_Send, "m_pounceVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
+//     /* Hunter */
+//     victim = GetEntPropEnt(client, Prop_Send, "m_pounceVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
 
-    /* Smoker */
-    victim = GetEntPropEnt(client, Prop_Send, "m_tongueVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
+//     /* Smoker */
+//     victim = GetEntPropEnt(client, Prop_Send, "m_tongueVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
 
-    /* Jockey */
-    victim = GetEntPropEnt(client, Prop_Send, "m_jockeyVictim");
-    if (victim > 0)
-    {
-        return victim;
-    }
+//     /* Jockey */
+//     victim = GetEntPropEnt(client, Prop_Send, "m_jockeyVictim");
+//     if (victim > 0)
+//     {
+//         return victim;
+//     }
 
-    return -1;
-}
+//     return -1;
+// }
 
 GetCurrentMapEx(String:map[],length)
 {
 	new String:old[length];
 	GetCurrentMap(old, length);
-	String_ToLower(old, map, length);
+	StringToLower(old, map, length);
+}
+
+StringToLower(const String:input[], String:output[], size)
+{
+	size--;
+
+	new x=0;
+	while (input[x] != '\0' && x < size) {
+
+		output[x] = CharToLower(input[x]);
+
+		x++;
+	}
+
+	output[x] = '\0';
 }

@@ -4,10 +4,11 @@
 #define PLUGIN_NAME           "l4d2_happyFestival"
 #define PLUGIN_AUTHOR         "mYui"
 #define PLUGIN_DESCRIPTION    "Gives Infinite Ammo when festival"
-#define PLUGIN_VERSION        "1.3"
+#define PLUGIN_VERSION        "1.4"
 #define PLUGIN_URL            "NA"
 
 #define MaxClients 32
+#define MaxListCount 32
 
 #include <sourcemod>
 #include <sdktools>
@@ -16,10 +17,15 @@
 #pragma semicolon 1
 
 new Throwing[MaxClients+1];
-new Inited;
+new Allowed;
+new bool:InitFinished;
 new bool:IsFestival;
 new IsWeekend;
-new Rate;
+new rate;
+new Float:compareRate;
+new Float:FailedCount;
+new String:saveList[MaxListCount][32];
+new count;
 
 public Plugin:myinfo =
 {
@@ -40,50 +46,63 @@ public OnPluginStart()
 	HookEvent("weapon_drop", Event_WeaponDrop);
 	HookEvent("player_disconnect", Event_PlayerDisconnect);
 	HookEvent("round_start", EventRoundStart);
+	HookEvent("round_end", EventRoundEnd);
 }
 
 public OnMapStart()
 {
-	Inited = 0;
+	Allowed = 0;
+	FailedCount = 0.0;
 }
 
 public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
 {
-	if (Inited == 0)
+	if (Allowed == 0 && !InitFinished)
 	{
+		Allowed = 1;
 		InitData(client);
 		if (IsFestival)
 		{
-			PrintToChatAll("\x04开呱!!开呱!!");
+			PrintToChatAll("\x04开趴!!");
 		} 
 		else if (IsWeekend == 1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,开呱!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,我的呱呱!", client, rate);
 		}
 		else if (IsWeekend == -1)
 		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,我的呱呢!", client, Rate);
+			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x05<\x04%.2f\x03 ,你小子!", client, rate, compareRate);
 		}
 		else
 		{
 			PrintToChatAll("\x05银趴结束了!");
 		}
 		CreateTimer(60.0, ReSet, _, TIMER_FLAG_NO_MAPCHANGE);
-		Inited = 1;
-		
-		
+		InitFinished = true;
 	}
+	return Plugin_Handled;
 }
 
 public Action:ReSet(Handle:timer)
 {
-	Inited = 0;
+	Allowed = 0;
 }
 
 public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	InitFinished = false;
 	IsFestival = false;
 	IsWeekend = 0;
+	compareRate = 100.0;
+	ReadTxt();
+}
+
+public Action:EventRoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	InitFinished = false;
+	IsFestival = false;
+	IsWeekend = 0;
+	compareRate = 100.0;
 }
 
 public Action:Event_PlayerDisconnect(Handle:event, String:event_name[], bool:dontBroadcast)
@@ -96,7 +115,7 @@ public Action:Event_WeaponFire(Handle:event, const String:name[], bool:dontBroad
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	GetEventString(event, "weapon", weapon, sizeof(weapon));
 	
-	if (!IsEnabled())
+	if (!IsEnabled(client, true))
 	{
 		return Plugin_Handled;
 	}
@@ -218,7 +237,7 @@ public Action:Event_WeaponDrop(Handle:event, const String:name[], bool:dontBroad
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	GetEventString(event, "item", weapon, sizeof(weapon));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, true))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -267,7 +286,7 @@ InitData(any:client)
 	LogMessage("date:%s,week:%s,time:%s:%s", date, week, hour, minute);
 	
 	new String:filePath[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, filePath, sizeof(filePath), "data/festival.txt");
+	BuildPath(Path_SM, filePath, sizeof(filePath), "data/festival/date.txt");
 	new Handle:fileHandle = OpenFile(filePath, "r");
 	decl String:strData[10000];
 	if(fileHandle != INVALID_HANDLE)
@@ -282,43 +301,147 @@ InitData(any:client)
 		IsFestival = true;
 		return;
 	}
-	new multiRate = GetRandomInt(100, 2000);
-	Rate = GetRandomInt(0, multiRate * client) % 100 + 1;
-	LogMessage("rate=%d",Rate);
-	
-	if(StrEqual(week,"Saturday") || StrEqual(week,"Sunday") || StrEqual(week,"Friday") && IsAtNight(hour, minute))
+	new multiRate = GetRandomInt(100, 1000);
+	rate = GetRandomInt(0, multiRate * client) % 100 + 1;
+	LogMessage("rate=%d",rate);
+	if(StrEqual(week,"Saturday") 
+		|| StrEqual(week,"Sunday") 
+		|| StrEqual(week,"Friday") && IsAfterEvening(hour, minute) 
+		|| StrEqual(week,"Monday") && IsBeforeMorning(hour, minute))
 	{
 		LogMessage("weekend=true");
-		
-		if (Rate > 50)
-		{
-			IsWeekend = 1;
-		}
-		else
-		{
-			IsWeekend = -1;
-		}
+		compareRate = FailedCount == 0 ? 50.0 : (50.0 / SquareRoot(FailedCount));
+	} 
+	else
+	{
+		new Float: add = GetRandomFloat(5.0, 25.0 - FailedCount < 10 ? FailedCount * 2 : 20.0);
+		compareRate = FailedCount == 0 ? (50.0 + add) : ((50.0 + add) / SquareRoot(FailedCount)); 
 	}
 	
+	LogMessage("compareRate=%f", compareRate);
+	if (compareRate < 20.0)
+	{
+		compareRate = 20.0;
+	}
+	if (rate > compareRate)
+	{
+		IsWeekend = 1;
+		FailedCount = 0.0;
+	}
+	else
+	{
+		IsWeekend = -1;
+		FailedCount = FailedCount + 1.0;
+	}
 }
 
-bool:IsAtNight(char[] hour, char[] minute)
+bool:IsAfterEvening(char[] hour, char[] minute)
 {
 	new h = StringToInt(hour);
 	new m = StringToInt(minute);
 	return h * 60 + m > 18 * 60;
 }
 
-bool:IsEnabled()
+
+bool:IsBeforeMorning(char[] hour, char[] minute)
 {
-	return IsFestival || IsWeekend == 1;
+	new h = StringToInt(hour);
+	new m = StringToInt(minute);
+	return h * 60 + m < 3 * 60;
+}
+
+bool:IsEnabled(int client, bool:isWeapon)
+{
+	return (IsFestival || IsWeekend == 1) && (!isWeapon || IsAuthorizedSurvivor(client));
+}
+
+bool:IsAuthorizedSurvivor(int client)
+{
+	if (!IsValidSurvivor(client, false))
+	{
+		return false;
+	}
+	decl String:buffer[32];
+	GetClientAuthId(client, AuthId_Steam2, buffer, 32, true);
+	new i = 0;
+	while (i < count)
+	{
+		if (strcmp(saveList[i], buffer, true) == 0)
+		{
+			return false;
+		}
+		i++;
+	}
+	return true;
+}
+
+bool:IsValidSurvivor(client, bool:allowbots)
+{
+	if ((client < 1) || (client > MaxClients))
+	{
+		return false;
+	}
+	if (!IsClientInGame(client) || !IsClientConnected(client))
+	{
+		return false;
+	}
+	if (GetClientTeam(client) != 2)
+	{
+		return false;
+	}
+	if (IsFakeClient(client) && !allowbots)
+	{
+		return false;
+	}
+	return true;
+}
+
+ReadTxt()
+{
+	new Handle:file = INVALID_HANDLE;
+	new String:filePath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, filePath, sizeof(filePath), "data/festival/banned.txt");
+	if (file != INVALID_HANDLE)
+	{
+		CloseHandle(file);
+		file = INVALID_HANDLE;
+	}
+	file = OpenFile(filePath, "r");
+	if (!file)
+	{
+		LogError("Error opening file via file '%s'.", filePath);
+		return -1;
+	}
+
+	decl String:buffer[32];
+	count = 0;
+	while (!IsEndOfFile(file))
+	{
+		ReadFileLine(file, buffer, 32);
+		if(strlen(buffer)>10)
+		{
+			if (Array_FindString(saveList, MaxListCount, buffer, false, 0) < 0)
+			{
+				LogMessage("Id: %s", buffer);
+				Format(saveList[count], 32, buffer);
+				count++;
+			}
+		}
+	}
+	if (file != INVALID_HANDLE)
+	{
+		CloseHandle(file);
+		file = INVALID_HANDLE;
+	}
+	
+	return 0;
 }
 
 public Action:Event_HealSuccess(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, false))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -336,7 +459,7 @@ public Action:Event_DefibrillatorUsed(Handle:event, const String:name[], bool:do
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, false))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -354,7 +477,7 @@ public Action:Event_PillsUsed(Handle:event, const String:name[], bool:dontBroadc
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, false))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -362,6 +485,7 @@ public Action:Event_PillsUsed(Handle:event, const String:name[], bool:dontBroadc
 		}
 	}
 }
+
 public Action:TimerPills(Handle:timer, any:client)
 {
 	CheatCommand(client, "give", "pain_pills");
@@ -371,7 +495,7 @@ public Action:Event_AdrenalineUsed(Handle:event, const String:name[], bool:dontB
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 
-	if (client > 0 && IsEnabled())
+	if (client > 0 && IsEnabled(client, false))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
@@ -391,4 +515,20 @@ stock CheatCommand(client, const String:command[], const String:arguments[])
 	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
 	FakeClientCommand(client, "%s %s", command, arguments );
 	SetCommandFlags(command, flags | FCVAR_CHEAT);
+}
+
+stock Array_FindString(const String:array[][], size, const String:str[], bool:caseSensitive=true, start=0)
+{
+	if (start < 0) {
+		start = 0;
+	}
+
+	for (new i=start; i < size; i++) {
+
+		if (StrEqual(array[i], str, caseSensitive)) {
+			return i;
+		}
+	}
+
+	return -1;
 }
