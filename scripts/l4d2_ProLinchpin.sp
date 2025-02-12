@@ -6,13 +6,13 @@
 #include <sdkhooks>
 #include <colors>
 //#include <hint>
-#include <left4dhooks>
+//#include <left4dhooks>
 //#include <smlib>
 
 #define DEBUG true
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.9.4.1"
+#define PLUGIN_VERSION "0.9.4.2"
 
 #define COUNTDOWN_ING_SOUND "buttons/blip1.wav"
 #define COUNTDOWN_ED_SOUND "buttons/blip2.wav"

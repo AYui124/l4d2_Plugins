@@ -3,7 +3,7 @@
 #define DEBUG
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "1.7.1"
+#define PLUGIN_VERSION "1.7.2"
 
 //pz constants (for SI type checking)
 #define IS_SMOKER	1
@@ -26,7 +26,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
-#include <left4dhooks>
+//#include <left4dhooks>
 
 new siCount;
 new siLimit;
@@ -80,7 +80,7 @@ new const String:RELATIVE_SOUND_PATH[5][128] =
 public void OnPluginStart()
 {
 	CreateConVar("l4d_is_version", PLUGIN_VERSION, "Infected Spawn Version",  FCVAR_SPONLY|FCVAR_DONTRECORD|FCVAR_NOTIFY);
-	handleTankWeight = CreateConVar("l4d_is_tank_weight", "30", "生成tank权重");
+	handleTankWeight = CreateConVar("l4d_is_tank_weight", "10", "生成tank权重");
 	handleTankWeightNearbyWitchBonus = CreateConVar("l4d_is_tank_weight_bonus", "10","附近有witch时tank权重附加倍率(需要witchdrop.smx)");
 	handleHunterWeight = CreateConVar("l4d_is_hunter_weight", "100", "生成hunter权重");
 	handleBoomerWeight = CreateConVar("l4d_is_boomer_weight", "100", "生成boomer权重");
@@ -100,17 +100,31 @@ public void OnPluginStart()
 
 	CreateConVar("tank_rate_up", "0", "", FCVAR_DONTRECORD);
 	
+	TweakGameCvar();
+	HookEvents();
+}
+
+TweakGameCvar()
+{
 	// SetConVarInt(FindConVar("z_smoker_limit"), 0);
 	// SetConVarInt(FindConVar("z_boomer_limit"), 0);
 	// SetConVarInt(FindConVar("z_hunter_limit"), 0);
 	// SetConVarInt(FindConVar("z_spitter_limit"), 0);
 	// SetConVarInt(FindConVar("z_jockey_limit"), 0);
 	// SetConVarInt(FindConVar("z_charger_limit"), 0);
-	SetConVarInt(FindConVar("director_no_specials"), 0);
+	// SetConVarInt(FindConVar("director_no_specials"), 0);
 	// SetConVarInt(FindConVar("director_no_bosses"), 0);
 
+	// default:1000
+	SetConVarInt(FindConVar("z_cooldown_spawn_safety_range"), 500);
+	// default:300
+	SetConVarInt(FindConVar("z_finale_spawn_safety_range"), 280);
+	// default:550
 	SetConVarInt(FindConVar("z_spawn_safety_range"), 350);
-	HookEvents();
+	// default:250
+	SetConVarInt(FindConVar("z_safe_spawn_range"), 200);
+	// default:1500		
+	SetConVarInt(FindConVar("z_spawn_range"), 1000);
 }
 
 HookEvents()
@@ -137,17 +151,43 @@ public OnMapEnd()
 {
 	leftSafeRoom = false;
 }
-
-public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
+public Action:TimerLeftSafeRoom(Handle:timer)
 {
-	if (!leftSafeRoom)
+	if (LeftStartArea())
 	{
-		if ((client < 1) || (client > MaxClients) || !IsClientInGame(client) || IsFakeClient(client))
-			return Plugin_Continue;
-		leftSafeRoom = true;
-		StartSpawnTimer();
+		OnLeftStartArea();
 	}
-	return Plugin_Continue;
+	else
+	{
+		CreateTimer(1.0, TimerLeftSafeRoom, _, TIMER_FLAG_NO_MAPCHANGE);
+	}
+}
+
+bool:LeftStartArea()
+{
+	new maxents = GetMaxEntities();
+	for (new i = MaxClients + 1; i <= maxents; i++)
+	{
+		if (IsValidEntity(i))
+		{
+			decl String:netclass[64];
+			GetEntityNetClass(i, netclass, sizeof(netclass));
+			if (StrEqual(netclass, "CTerrorPlayerResource"))
+			{
+				if (GetEntProp(i, Prop_Send, "m_hasAnySurvivorLeftSafeArea"))
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+OnLeftStartArea()
+{
+	leftSafeRoom = true;
+	StartSpawnTimer();
 }
 
 StartSpawnTimer()
@@ -331,11 +371,12 @@ GenerateSpawn(client)
 			if(spawnQueue[i] < 0) //stops if the current array index is out of bound
 				break;
 			//LogMessage("GenerateSpawn type=%d", spawnQueue[i]);
-			if(!L4dHookSpawnSpecial(client, spawnQueue[i]))
-			{
-				ZspawnSpecial(client, spawnQueue[i]);
+			//if(!L4dHookSpawnSpecial(client, spawnQueue[i]))
+			//{
+				//ZspawnSpecial(client, spawnQueue[i]);
 				//LogMessage("GenerateSpawn L4dHookSpawnSpecial failed");
-			}
+			//}
+			ZspawnSpecial(client, spawnQueue[i]);
 			firstSpawn = false;
 		}
 	}
@@ -352,35 +393,35 @@ ZspawnSpecial(any: client, any: type)
 	CheatCommand(client, "z_spawn_old", spawns[type]); 
 }
 
-bool:L4dHookSpawnSpecial(any: client, any: type)
-{
-	new Float:vPos[3];
-	new class = type == SI_TANK ? type + 2 : type + 1;
+// bool:L4dHookSpawnSpecial(any: client, any: type)
+// {
+// 	new Float:vPos[3];
+// 	new class = type == SI_TANK ? type + 2 : type + 1;
     
-	if (!L4D_GetRandomPZSpawnPosition(client, class, 100, vPos))
-	{
-		//LogMessage("Couldn't find a valid spawn position in 20 tries");
-		return false;
-	}
-	if (class == IS_TANK)
-	{
-		new bool:tank = L4D2_SpawnTank(vPos, NULL_VECTOR) > 0;
-		if (!tank)
-		{
-			//LogMessage("L4D2_SpawnTank failed");
-		}
-		return tank;
-	} 
-	else 
-	{
-		new bool:special = L4D2_SpawnSpecial(class, vPos, NULL_VECTOR) > 0;
-		if (!special)
-		{
-			//LogMessage("L4D2_SpawnSpecial failed");
-		}
-		return special;
-	}
-}
+// 	if (!L4D_GetRandomPZSpawnPosition(client, class, 100, vPos))
+// 	{
+// 		//LogMessage("Couldn't find a valid spawn position in 20 tries");
+// 		return false;
+// 	}
+// 	if (class == IS_TANK)
+// 	{
+// 		new bool:tank = L4D2_SpawnTank(vPos, NULL_VECTOR) > 0;
+// 		if (!tank)
+// 		{
+// 			//LogMessage("L4D2_SpawnTank failed");
+// 		}
+// 		return tank;
+// 	} 
+// 	else 
+// 	{
+// 		new bool:special = L4D2_SpawnSpecial(class, vPos, NULL_VECTOR) > 0;
+// 		if (!special)
+// 		{
+// 			//LogMessage("L4D2_SpawnSpecial failed");
+// 		}
+// 		return special;
+// 	}
+// }
 
 SITypeCount() //Count the number of each SI ingame
 {
@@ -494,6 +535,7 @@ public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadc
 	infectType = 0;
 	firstSpawn = true;
 	//CreateTimer(60.0, FixNoSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(1.0, TimerLeftSafeRoom, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action:FixNoSpawn(Handle:timer)
@@ -524,7 +566,7 @@ public Action:LeaveStasis(Handle:timer, any:client)
 	if ((client < 1) || (client > MaxClients) || !IsClientInGame(client) || !IsFakeClient(client))
 		return;
 	//LogMessage("Call DealDamage:%d", client);
-	DealDamage(client, 0, GetRandomSurvivor(1, 0), DMG_BULLET, "weapon_rifle_ak47");
+	DealDamage(client, 0, GetRandomSurvivor(), DMG_BULLET, "weapon_rifle_ak47");
 }
 
 DealDamage(int victim, int damage, int attacker = 0, int dmg_type = DMG_GENERIC, char[] weapon = "")
@@ -688,6 +730,21 @@ public Action:KickBot(Handle:timer, any:client)
 			KickClient(client);
 		}
 	}
+}
+
+public int GetRandomSurvivor() 
+{
+	int survivors[MAXPLAYERS];
+	int numSurvivors = 0;
+	for( int i = 0; i < MAXPLAYERS; i++ )
+	{
+		if(IsValidSurvivor(i,true) && IsPlayerAlive(i)) 
+		{
+		    survivors[numSurvivors] = i;
+		    numSurvivors++;
+		}
+	}
+	return survivors[GetRandomInt(0, numSurvivors - 1)];
 }
 
 

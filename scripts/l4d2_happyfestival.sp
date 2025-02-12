@@ -4,7 +4,7 @@
 #define PLUGIN_NAME           "l4d2_happyFestival"
 #define PLUGIN_AUTHOR         "Yui"
 #define PLUGIN_DESCRIPTION    "Gives Infinite Ammo when festival"
-#define PLUGIN_VERSION        "1.4"
+#define PLUGIN_VERSION        "1.5.0"
 #define PLUGIN_URL            "NA"
 
 #define MaxClients 32
@@ -12,13 +12,10 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <left4dhooks>
 
 #pragma semicolon 1
 
 new Throwing[MaxClients+1];
-new Allowed;
-new bool:InitFinished;
 new bool:IsFestival;
 new IsWeekend;
 new rate;
@@ -26,6 +23,7 @@ new Float:compareRate;
 new Float:FailedCount;
 new String:saveList[MaxListCount][32];
 new count;
+new ColdDown;
 
 public Plugin:myinfo =
 {
@@ -53,7 +51,7 @@ public OnPluginStart()
 
 public OnMapStart()
 {
-	Allowed = 0;
+	ColdDown = 0;
 	FailedCount = 0.0;
 }
 
@@ -65,65 +63,113 @@ public Action:Cmd_ChangeGenerade(client, args)
 		new allow = GetConVarInt(cvar);
 		if (allow == 1)
 		{
-			PrintToChat(client, "已关闭无限手榴弹");
+			PrintToChat(client, "已关闭无限手雷");
 			SetConVarInt(cvar, 0);
 		}
 		else
 		{
-			PrintToChat(client, "已开启无限手榴弹");
+			PrintToChat(client, "已开启无限手雷");
 			SetConVarInt(cvar, 1);
 		}
 	}
 }
 
-public Action:L4D_OnFirstSurvivorLeftSafeArea(client)
-{
-	if (Allowed == 0 && !InitFinished)
-	{
-		Allowed = 1;
-		InitData(client);
-		if (IsFestival)
-		{
-			PrintToChatAll("\x04开趴!!");
-		} 
-		else if (IsWeekend == 1)
-		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03 ,我的呱呱!", client, rate);
-		}
-		else if (IsWeekend == -1)
-		{
-			PrintToChatAll("\x04%N\x03Roll点:\x04%d\x05<\x04%.2f\x03 ,你小子!", client, rate, compareRate);
-		}
-		else
-		{
-			PrintToChatAll("\x05银趴结束了!");
-		}
-		CreateTimer(60.0, ReSet, _, TIMER_FLAG_NO_MAPCHANGE);
-		InitFinished = true;
-	}
-	return Plugin_Handled;
-}
-
-public Action:ReSet(Handle:timer)
-{
-	Allowed = 0;
-}
-
 public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	InitFinished = false;
 	IsFestival = false;
 	IsWeekend = 0;
 	compareRate = 100.0;
 	ReadTxt();
+
+	CreateTimer(1.0, TimerLeftSafeRoom, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action:EventRoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	InitFinished = false;
 	IsFestival = false;
 	IsWeekend = 0;
 	compareRate = 100.0;
+}
+
+public Action:TimerLeftSafeRoom(Handle:timer)
+{
+	if (LeftStartArea())
+	{
+		if (ColdDown == 0)
+		{
+			OnLeaveStartArea();
+		}
+		else
+		{
+			PrintToChatAll("\x03呱呱冷却中:\x04%d\x03s!", ColdDown);
+		}
+	}
+	else
+	{
+		CreateTimer(1.0, TimerLeftSafeRoom, _, TIMER_FLAG_NO_MAPCHANGE);
+	}
+}
+
+bool:LeftStartArea()
+{
+	new maxents = GetMaxEntities();
+	for (new i = MaxClients + 1; i <= maxents; i++)
+	{
+		if (IsValidEntity(i))
+		{
+			decl String:netclass[64];
+			GetEntityNetClass(i, netclass, sizeof(netclass));
+			if (StrEqual(netclass, "CTerrorPlayerResource"))
+			{
+				if (GetEntProp(i, Prop_Send, "m_hasAnySurvivorLeftSafeArea"))
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+void OnLeaveStartArea()
+{
+	ColdDown = 120;
+	new client = GetRandomSurvivor();
+	InitData(client);
+	if (IsFestival)
+	{
+		PrintToChatAll("\x04开趴!!");
+	} 
+	else if (IsWeekend == 1)
+	{
+		PrintToChatAll("\x04%N\x03Roll点:\x04%d\x03, 有呱", client, rate);
+	}
+	else if (IsWeekend == -1)
+	{
+		PrintToChatAll("\x04%N\x03Roll点:\x04%d\x05<\x04%.2f\x03, 那我问你", client, rate, compareRate);
+		if (FailedCount > 1)
+		{
+			PrintToChatAll("\x03Roll点失败次数\x04%d, 你脸怎么黑黑的", FailedCount);
+		}
+	}
+	else
+	{
+		PrintToChatAll("\x05银趴结束了!");
+	}
+	CreateTimer(1.0, CountDown, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action:CountDown(Handle:timer)
+{
+	if (ColdDown > 0)
+	{
+		ColdDown--;
+		CreateTimer(1.0, CountDown, _, TIMER_FLAG_NO_MAPCHANGE);
+	}
+	else
+	{
+		ColdDown = 0;
+	}
 }
 
 public Action:Event_PlayerDisconnect(Handle:event, String:event_name[], bool:dontBroadcast)
@@ -349,7 +395,7 @@ InitData(any:client)
 	{
 		compareRate = 20.0;
 	}
-	if (rate > compareRate)
+	if (rate >= compareRate)
 	{
 		IsWeekend = 1;
 		FailedCount = 0.0;
@@ -540,7 +586,7 @@ stock CheatCommand(client, const String:command[], const String:arguments[])
 	new flags = GetCommandFlags(command);
 	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
 	FakeClientCommand(client, "%s %s", command, arguments );
-	SetCommandFlags(command, flags | FCVAR_CHEAT);
+	SetCommandFlags(command, flags);
 }
 
 stock Array_FindString(const String:array[][], size, const String:str[], bool:caseSensitive=true, start=0)
@@ -557,4 +603,22 @@ stock Array_FindString(const String:array[][], size, const String:str[], bool:ca
 	}
 
 	return -1;
+}
+
+stock GetRandomSurvivor()
+{
+	new survivors[MAXPLAYERS];
+	new numSurvivors = 0;
+	new last = 0;
+	for (new i = 0; i < MAXPLAYERS; i++) 
+	{
+		if (i > 0 && i <= MaxClients && IsClientInGame(i) && GetClientTeam(i) == 2 && IsPlayerAlive(i))
+		{
+		    survivors[numSurvivors] = i;
+		    last = i;
+		    numSurvivors++;
+		}
+	}
+	new client = survivors[GetRandomInt(0, numSurvivors - 1)];
+	return IsClientInGame(client) && GetClientTeam(client) ? client : last;
 }

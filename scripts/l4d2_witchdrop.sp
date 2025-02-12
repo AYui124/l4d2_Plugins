@@ -115,56 +115,39 @@ StartSpawnTimer()
 
 public Action:Timer_WaitWitchSpawn(Handle:timer)
 {
+	new Float:interval = 0.0;
 	new count = GetWitchCount();
 	if (count >= 3 || count < 0)
 	{
-		new Float:interval = GetRandomFloat(20.0, 50.0);
-		if (timerSpawn != INVALID_HANDLE)
-		{ 
-			KillTimer(timerSpawn);
-			timerSpawn = INVALID_HANDLE;
-		}
-		timerSpawn = CreateTimer(interval, Timer_WaitWitchSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
+		interval = GetRandomFloat(20.0, 50.0);
 	}
 	else if (count > 0 && count < 3)
 	{
-		SpawnWitch();
-		new Float:interval = GetRandomFloat(45.0, 90.0);
-		if (timerSpawn != INVALID_HANDLE)
-		{ 
-			KillTimer(timerSpawn);
-			timerSpawn = INVALID_HANDLE;
-		}
-		timerSpawn = CreateTimer(interval, Timer_WaitWitchSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
+		interval = SpawnWitch() ? GetRandomFloat(45.0, 90.0) : 1.0;
 	}
 	else if (count == 0)
 	{
-		SpawnWitch();
-		new Float:interval = GetRandomFloat(80.0, 120.0);
-		if (timerSpawn != INVALID_HANDLE)
-		{ 
-			KillTimer(timerSpawn);
-			timerSpawn = INVALID_HANDLE;
-		}
-		timerSpawn = CreateTimer(interval, Timer_WaitWitchSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
+		interval = SpawnWitch() ? GetRandomFloat(80.0, 120.0) : 1.0;
 	}
+	if (timerSpawn != INVALID_HANDLE)
+	{ 
+		KillTimer(timerSpawn);
+		timerSpawn = INVALID_HANDLE;
+	}
+	timerSpawn = CreateTimer(interval, Timer_WaitWitchSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-SpawnWitch()
+bool:SpawnWitch()
 {
 	new client = GetAnyClient();
 	if (client)
 	{
 		ExecuteCheatCommand(client, "z_spawn_old", "witch", "auto");
+		return true;
 	}
 	else
 	{
-		if (timerSpawn != INVALID_HANDLE)
-		{
-			KillTimer(timerSpawn);
-			timerSpawn = INVALID_HANDLE;
-		}
-		timerSpawn = CreateTimer(1.0, Timer_WaitWitchSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
+		return false;
 	}
 }
 
@@ -178,7 +161,8 @@ GetAnyClient()
 	return 0;
 }
 
-ExecuteCheatCommand(client, const String:command[], String:param1[], String:param2[]) {
+ExecuteCheatCommand(client, const String:command[], String:param1[], String:param2[]) 
+{
 	new admindata = GetUserFlagBits(client);
 	SetUserFlagBits(client, ADMFLAG_ROOT);
 	new flags = GetCommandFlags(command);
@@ -357,51 +341,51 @@ GetWitchCount()
 	return count;
 }
 
-bool:IsSpecialInfected(client)
-{
-    return IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") != 8 && GetEntProp(client, Prop_Send, "m_zombieClass") != 7;
-}
+// bool:IsSpecialInfected(client)
+// {
+//     return IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") != 8 && GetEntProp(client, Prop_Send, "m_zombieClass") != 7;
+// }
 
-GetSICount()
-{
-	new count = 0;
-	for (new i = 1; i <= MaxClients; i++)
-	{
-		if (IsSpecialInfected(i))
-		{
-			count += 1;
-		}
-	}
-	return count;
-}
+// GetSICount()
+// {
+// 	new count = 0;
+// 	for (new i = 1; i <= MaxClients; i++)
+// 	{
+// 		if (IsSpecialInfected(i))
+// 		{
+// 			count += 1;
+// 		}
+// 	}
+// 	return count;
+// }
 
-bool:IsTank(client)
-{
-    return IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8;
-}
+// bool:IsTank(client)
+// {
+//     return IsClientInGame(client) && GetClientTeam(client) == 3 && GetEntProp(client, Prop_Send, "m_zombieClass") == 8;
+// }
 
-GetTankCount()
-{
-	new count = 0;
-	for (new i = 1; i <= MaxClients; i++)
-	{
-		if (IsTank(i))
-		{
-			count += 1;
-		}
-	}
-	return count;
-}
+// GetTankCount()
+// {
+// 	new count = 0;
+// 	for (new i = 1; i <= MaxClients; i++)
+// 	{
+// 		if (IsTank(i))
+// 		{
+// 			count += 1;
+// 		}
+// 	}
+// 	return count;
+// }
 
-GetAliveSurvivorCount()
-{
-	new count = 0;
-	for (new i = 1; i <= MaxClients; i++)
-	{
-		if (IsSurvivor(i) && IsPlayerAlive(i) && !IsFakeClient(i))
-		{
-			count += 1;
-		}
-	}
-	return count;
-}
+// GetAliveSurvivorCount()
+// {
+// 	new count = 0;
+// 	for (new i = 1; i <= MaxClients; i++)
+// 	{
+// 		if (IsSurvivor(i) && IsPlayerAlive(i) && !IsFakeClient(i))
+// 		{
+// 			count += 1;
+// 		}
+// 	}
+// 	return count;
+// }

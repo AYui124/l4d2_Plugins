@@ -14,6 +14,21 @@
 #define Upgrade 12
 #define GiftModel "models/items/l4d_gift.mdl"
 
+/*
+*
+* 17%  枪
+* 21%  近战
+* 3.4% 手枪
+* 2.4% 榴弹
+* 2.4% M60
+* 2.4% 沙鹰
+* 2.4% 电锯
+* 24%  雷/胆汁/火瓶
+* 13%  电击/医疗/药/针
+* 12%  升级/油桶
+*
+*/
+
 static MODEL_DEFIB;
 
 

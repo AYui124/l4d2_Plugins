@@ -295,14 +295,14 @@ public Action: CheckServerStartChange(Handle: timer)
 public Action:L4D_OnFirstSurvivorLeftSafeArea(int client)
 {
     //LogMessage("LeftSafeArea:%N", client);
-    if(L4D_IsMissionFinalMap() && !called)
-    {
+	if(L4D_IsMissionFinalMap() && !called)
+	{
 		called = true;
 		nextMap = "";
 		nextName = "";
 		CreateTimer(1.0, RandomMap);
-    }
-    if (firstChanged)
+	}
+	if (firstChanged)
 	{
 		firstChanged = false;
 		// for (new i = 1; i <= MaxClients; i++)
