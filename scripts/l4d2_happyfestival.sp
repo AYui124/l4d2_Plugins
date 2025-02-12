@@ -46,7 +46,7 @@ public OnPluginStart()
 	HookEvent("player_disconnect", Event_PlayerDisconnect);
 	HookEvent("round_start", EventRoundStart);
 	HookEvent("round_end", EventRoundEnd);
-	RegAdminCmd("sm_hfg", Cmd_ChangeGenerade, ADMFLAG_CHEATS);
+	//RegAdminCmd("sm_hfg", Cmd_ChangeGenerade, ADMFLAG_CHEATS);
 }
 
 public OnMapStart()
@@ -55,24 +55,24 @@ public OnMapStart()
 	FailedCount = 0.0;
 }
 
-public Action:Cmd_ChangeGenerade(client, args)
-{
-	if (IsClientInGame(client))
-	{
-		new Handle:cvar = FindConVar("l4d2_hf_enable_generade");
-		new allow = GetConVarInt(cvar);
-		if (allow == 1)
-		{
-			PrintToChat(client, "已关闭无限手雷");
-			SetConVarInt(cvar, 0);
-		}
-		else
-		{
-			PrintToChat(client, "已开启无限手雷");
-			SetConVarInt(cvar, 1);
-		}
-	}
-}
+// public Action:Cmd_ChangeGenerade(client, args)
+// {
+// 	if (IsClientInGame(client))
+// 	{
+// 		new Handle:cvar = FindConVar("l4d2_hf_enable_generade");
+// 		new allow = GetConVarInt(cvar);
+// 		if (allow == 1)
+// 		{
+// 			PrintToChat(client, "已关闭无限手雷");
+// 			SetConVarInt(cvar, 0);
+// 		}
+// 		else
+// 		{
+// 			PrintToChat(client, "已开启无限手雷");
+// 			SetConVarInt(cvar, 1);
+// 		}
+// 	}
+// }
 
 public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
@@ -133,8 +133,8 @@ bool:LeftStartArea()
 
 void OnLeaveStartArea()
 {
-	ColdDown = 120;
-	new client = GetRandomSurvivor();
+	ColdDown = 60;
+	new client = HF_GetRandomSurvivor();
 	InitData(client);
 	if (IsFestival)
 	{
@@ -163,7 +163,7 @@ public Action:CountDown(Handle:timer)
 {
 	if (ColdDown > 0)
 	{
-		ColdDown--;
+		ColdDown = ColdDown - 1;
 		CreateTimer(1.0, CountDown, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	else
@@ -605,7 +605,7 @@ stock Array_FindString(const String:array[][], size, const String:str[], bool:ca
 	return -1;
 }
 
-stock GetRandomSurvivor()
+stock HF_GetRandomSurvivor()
 {
 	new survivors[MAXPLAYERS];
 	new numSurvivors = 0;
