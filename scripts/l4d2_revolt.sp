@@ -159,6 +159,7 @@ public void OnMapStart()
 
 public void RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
+	ResetToSurvivor();
 }
 
 public void RoundEnd(Event event, const char[] name, bool dontBroadcast)
@@ -269,7 +270,7 @@ bool IsValidClient(int client, bool allowBot)
 
 void ResetToSurvivor()
 {
-	for (int i = 1;i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsValidClient(i, false))
 		{

@@ -4,7 +4,7 @@
 #define PLUGIN_NAME           "l4d2_happyFestival"
 #define PLUGIN_AUTHOR         "Yui"
 #define PLUGIN_DESCRIPTION    "Gives Infinite Ammo when festival"
-#define PLUGIN_VERSION        "1.5.0"
+#define PLUGIN_VERSION        "1.6.1"
 #define PLUGIN_URL            "NA"
 
 #define MaxClients 32
@@ -15,7 +15,7 @@
 
 #pragma semicolon 1
 
-new Throwing[MaxClients+1];
+//new Throwing[MaxClients+1];
 new bool:IsFestival;
 new IsWeekend;
 new rate;
@@ -36,13 +36,13 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
-	CreateConVar("l4d2_hf_enable_generade", "0", "是否允许投掷物");
+	CreateConVar("l4d2_hf_enable_generade", "1", "是否允许投掷物");
 	HookEvent("defibrillator_used", Event_DefibrillatorUsed);
 	HookEvent("heal_success", Event_HealSuccess);
 	HookEvent("adrenaline_used", Event_AdrenalineUsed);
 	HookEvent("pills_used", Event_PillsUsed);
 	HookEvent("weapon_fire", Event_WeaponFire);
-	HookEvent("weapon_drop", Event_WeaponDrop);
+	//HookEvent("weapon_drop", Event_WeaponDrop);
 	HookEvent("player_disconnect", Event_PlayerDisconnect);
 	HookEvent("round_start", EventRoundStart);
 	HookEvent("round_end", EventRoundEnd);
@@ -80,7 +80,6 @@ public Action:EventRoundStart(Handle:event, const String:name[], bool:dontBroadc
 	IsWeekend = 0;
 	compareRate = 100.0;
 	ReadTxt();
-
 	CreateTimer(1.0, TimerLeftSafeRoom, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -134,7 +133,7 @@ bool:LeftStartArea()
 void OnLeaveStartArea()
 {
 	ColdDown = 60;
-	new client = HF_GetRandomSurvivor();
+	new client = HF_GetRandomPlayerSurvivor();
 	InitData(client);
 	if (IsFestival)
 	{
@@ -197,10 +196,13 @@ public Action:Event_WeaponFire(Handle:event, const String:name[], bool:dontBroad
 	
 	new slot = -1;
 	new clipsize;
-	Throwing[client] = 0;
+	//Throwing[client] = 0;
 	if (StrEqual(weapon, "pipe_bomb") || StrEqual(weapon, "vomitjar") || StrEqual(weapon, "molotov"))
 	{
-		Throwing[client] = 1;
+		new DataPack:dataPack = CreateDataPack();
+		WritePackCell(dataPack, client);
+		WritePackString(dataPack, weapon);
+		CreateTimer(1.0, DelayGiveThrowable, dataPack, TIMER_FLAG_NO_MAPCHANGE);
 	}
 	else if (StrEqual(weapon, "grenade_launcher"))
 	{
@@ -254,8 +256,8 @@ public Action:Event_WeaponFire(Handle:event, const String:name[], bool:dontBroad
 	}
 	else if (StrEqual(weapon, "rifle_desert"))
 	{
-			slot = 0;
-			clipsize = 60;
+		slot = 0;
+		clipsize = 60;
 	}
 	else if (StrEqual(weapon, "rifle_m60"))
 	{
@@ -298,49 +300,85 @@ public Action:Event_WeaponFire(Handle:event, const String:name[], bool:dontBroad
 	return Plugin_Handled;
 }
 
-public Action:Event_WeaponDrop(Handle:event, const String:name[], bool:dontBroadcast)
+public Action:DelayGiveThrowable(Handle:timer, DataPack:pack)
 {
+	decl String:weapon[64];
+	ResetPack(pack, false);
+	new client = ReadPackCell(pack);
+	ReadPackString(pack, weapon, 64);
+	CloseHandle(pack);
+
 	new Handle:cvar = FindConVar("l4d2_hf_enable_generade");
 	new allow = GetConVarInt(cvar);
-	new String:weapon[64];
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	GetEventString(event, "item", weapon, sizeof(weapon));
-
 	if (client > 0 && IsEnabled(client, true))
 	{
 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
 		{
-		    int needChange = 0;
-		    if (Throwing[client] == 1)
+		    if (allow == 1)
 			{
-				if (allow == 1)
+				if (StrEqual(weapon, "pipe_bomb"))
 				{
-					if (StrEqual(weapon, "pipe_bomb"))
-					{
-						needChange = 1;
-						CheatCommand(client, "give", "pipe_bomb");
-					}
-					else if (StrEqual(weapon, "vomitjar"))
-					{
-						needChange = 1;
-						CheatCommand(client, "give", "vomitjar");
-					}
-					else if (StrEqual(weapon, "molotov"))
-					{
-						needChange = 1;
-						CheatCommand(client, "give", "molotov");
-					}
+					CheatCommand(client, "give", "pipe_bomb");
 				}
-				Throwing[client] = 0;
+				else if (StrEqual(weapon, "vomitjar"))
+				{
+					CheatCommand(client, "give", "vomitjar");
+				}
+				else if (StrEqual(weapon, "molotov"))
+				{
+					CheatCommand(client, "give", "molotov");
+				}
 			}
-		    if (needChange == 1)
-			{
-				new weaponEnt = GetPlayerWeaponSlot(client, 2);
-				SetEntPropEnt(client, Prop_Send, "m_hActiveWeapon", weaponEnt);
-			}
+			// new weaponEnt = GetPlayerWeaponSlot(client, 2);
+			// SetEntPropEnt(client, Prop_Send, "m_hActiveWeapon", weaponEnt);
 		}
 	}
+
 }
+
+// public Action:Event_WeaponDrop(Handle:event, const String:name[], bool:dontBroadcast)
+// {
+// 	new Handle:cvar = FindConVar("l4d2_hf_enable_generade");
+// 	new allow = GetConVarInt(cvar);
+// 	new String:weapon[64];
+// 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+// 	GetEventString(event, "item", weapon, sizeof(weapon));
+
+// 	if (client > 0 && IsEnabled(client, true))
+// 	{
+// 		if (IsClientInGame(client) && IsPlayerAlive(client) && GetClientTeam(client) == 2)
+// 		{
+// 		    int needChange = 0;
+// 		    if (Throwing[client] == 1)
+// 			{
+// 				if (allow == 1)
+// 				{
+// 					if (StrEqual(weapon, "pipe_bomb"))
+// 					{
+// 						needChange = 1;
+// 						CheatCommand(client, "give", "pipe_bomb");
+// 					}
+// 					else if (StrEqual(weapon, "vomitjar"))
+// 					{
+// 						needChange = 1;
+// 						CheatCommand(client, "give", "vomitjar");
+// 					}
+// 					else if (StrEqual(weapon, "molotov"))
+// 					{
+// 						needChange = 1;
+// 						CheatCommand(client, "give", "molotov");
+// 					}
+// 				}
+// 				Throwing[client] = 0;
+// 			}
+// 		    if (needChange == 1)
+// 			{
+// 				new weaponEnt = GetPlayerWeaponSlot(client, 2);
+// 				SetEntPropEnt(client, Prop_Send, "m_hActiveWeapon", weaponEnt);
+// 			}
+// 		}
+// 	}
+// }
 
 InitData(any:client)
 {
@@ -605,20 +643,33 @@ stock Array_FindString(const String:array[][], size, const String:str[], bool:ca
 	return -1;
 }
 
-stock HF_GetRandomSurvivor()
+stock HF_GetRandomPlayerSurvivor()
 {
 	new survivors[MAXPLAYERS];
 	new numSurvivors = 0;
 	new last = 0;
+	new lastBot = 0;
 	for (new i = 0; i < MAXPLAYERS; i++) 
 	{
 		if (i > 0 && i <= MaxClients && IsClientInGame(i) && GetClientTeam(i) == 2 && IsPlayerAlive(i))
 		{
-		    survivors[numSurvivors] = i;
-		    last = i;
-		    numSurvivors++;
+			if (!IsFakeClient(i))
+			{
+				survivors[numSurvivors] = i;
+				last = i;
+				numSurvivors++;
+			} 
+			else
+			{
+				lastBot = i;
+			}
+		    
 		}
 	}
+	if (numSurvivors == 0)
+	{
+		return lastBot;
+	}
 	new client = survivors[GetRandomInt(0, numSurvivors - 1)];
-	return IsClientInGame(client) && GetClientTeam(client) ? client : last;
+	return IsClientInGame(client) && GetClientTeam(client) == 2 ? client : last;
 }

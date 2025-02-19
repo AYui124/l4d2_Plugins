@@ -106,25 +106,12 @@ public void OnPluginStart()
 
 TweakGameCvar()
 {
-	// SetConVarInt(FindConVar("z_smoker_limit"), 0);
-	// SetConVarInt(FindConVar("z_boomer_limit"), 0);
-	// SetConVarInt(FindConVar("z_hunter_limit"), 0);
-	// SetConVarInt(FindConVar("z_spitter_limit"), 0);
-	// SetConVarInt(FindConVar("z_jockey_limit"), 0);
-	// SetConVarInt(FindConVar("z_charger_limit"), 0);
-	// SetConVarInt(FindConVar("director_no_specials"), 0);
-	// SetConVarInt(FindConVar("director_no_bosses"), 0);
-
-	// default:1000
-	SetConVarInt(FindConVar("z_cooldown_spawn_safety_range"), 500);
-	// default:300
-	SetConVarInt(FindConVar("z_finale_spawn_safety_range"), 280);
-	// default:550
-	SetConVarInt(FindConVar("z_spawn_safety_range"), 350);
-	// default:250
-	SetConVarInt(FindConVar("z_safe_spawn_range"), 200);
-	// default:1500		
-	SetConVarInt(FindConVar("z_spawn_range"), 1000);
+	new Handle:zMaxPlayerZombies = FindConVar("z_max_player_zombies");
+	int flags = GetConVarFlags(zMaxPlayerZombies);
+	SetConVarBounds(zMaxPlayerZombies, ConVarBound_Upper, false);
+	SetConVarFlags(zMaxPlayerZombies, flags & ~FCVAR_NOTIFY);
+	SetConVarInt(zMaxPlayerZombies, 28);
+	SetConVarInt(FindConVar("z_spawn_safety_range"), 100); // default: 550
 }
 
 HookEvents()
@@ -371,11 +358,6 @@ GenerateSpawn(client)
 			if(spawnQueue[i] < 0) //stops if the current array index is out of bound
 				break;
 			//LogMessage("GenerateSpawn type=%d", spawnQueue[i]);
-			//if(!L4dHookSpawnSpecial(client, spawnQueue[i]))
-			//{
-				//ZspawnSpecial(client, spawnQueue[i]);
-				//LogMessage("GenerateSpawn L4dHookSpawnSpecial failed");
-			//}
 			ZspawnSpecial(client, spawnQueue[i]);
 			firstSpawn = false;
 		}
@@ -392,36 +374,6 @@ ZspawnSpecial(any: client, any: type)
 	}
 	CheatCommand(client, "z_spawn_old", spawns[type]); 
 }
-
-// bool:L4dHookSpawnSpecial(any: client, any: type)
-// {
-// 	new Float:vPos[3];
-// 	new class = type == SI_TANK ? type + 2 : type + 1;
-    
-// 	if (!L4D_GetRandomPZSpawnPosition(client, class, 100, vPos))
-// 	{
-// 		//LogMessage("Couldn't find a valid spawn position in 20 tries");
-// 		return false;
-// 	}
-// 	if (class == IS_TANK)
-// 	{
-// 		new bool:tank = L4D2_SpawnTank(vPos, NULL_VECTOR) > 0;
-// 		if (!tank)
-// 		{
-// 			//LogMessage("L4D2_SpawnTank failed");
-// 		}
-// 		return tank;
-// 	} 
-// 	else 
-// 	{
-// 		new bool:special = L4D2_SpawnSpecial(class, vPos, NULL_VECTOR) > 0;
-// 		if (!special)
-// 		{
-// 			//LogMessage("L4D2_SpawnSpecial failed");
-// 		}
-// 		return special;
-// 	}
-// }
 
 SITypeCount() //Count the number of each SI ingame
 {
