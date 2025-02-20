@@ -179,29 +179,39 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 
 		Format(temp, sizeof(temp), "%s%s%s", lastDir, file, lastExt);
 		#if DebugVpkInfo
-			LogMessage("new file=[%s],length=%d", temp, entryLength);
+			LogMessage("new file=[%s]", temp);
 		#endif
 		// We only need to get txt in missions directory
 		if (StrContains(temp, "missions/") > -1)
 		{
-			LogMessage("Find mission=[%s],length=%d", temp, entryLength);
-			// int currentPostion = fileVpk.Position;
-			// fileVpk.Seek(entryOffset, SEEK_SET);
-			// File mission = OpenFile(missionFile, "wb+");
-			// for(int index=0;index<entryLength;index++)
-			// {
-			// 	int copyByte;
-			// 	ReadFileCell(fileVpk, copyByte, 1);
-			// 	WriteFileCell(mission, copyByte, 1);
-			// }
-			// mission.Flush();
-			// delete mission;
-			// #if DebugVpkInfo
-			// 	LogMessage("new file=[%s],length=%d", temp, entryLength);
-			// #endif
-			// fileVpk.Seek(currentPostion, SEEK_SET);
+			LogMessage("Find mission=[%s],%d-%d-%d", temp, entryPreloadBytes, entryOffset, entryLength);
+			File fRead = OpenFile(filePath, "rb");
+			fRead.Seek(fileVpk.Position, SEEK_SET);
+			File fWrite = OpenFile(missionFile, "wb+");
+			if (entryPreloadBytes > 0)
+			{
+				for (int index = 0; index < entryPreloadBytes; index++)
+				{
+					int copyByte;
+					ReadFileCell(fRead, copyByte, 1);
+					WriteFileCell(fWrite, copyByte, 1);
+				}
+			}
+			
+			if (entryLength > 0)
+			{
+				fRead.Seek(entryOffset + entryPreloadBytes, SEEK_SET);
+				for (int index = 0; index < entryLength; index++)
+				{
+					int copyByte;
+					ReadFileCell(fRead, copyByte, 1);
+					WriteFileCell(fWrite, copyByte, 1);
+				}
+			}
+			fWrite.Flush();
+			delete fRead;
+			delete fWrite;
 		}
-
 
 		if (entryPreloadBytes)
 		{
