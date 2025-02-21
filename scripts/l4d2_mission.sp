@@ -2,7 +2,7 @@
 *	l4d2_mission
 *	Copyright (C) 2025 Yui
 *   
-*   Function of VPK File extraction is modified from https://github.com/SilvDev/VPK_API
+*   Function about VPK file refers to https://github.com/SilvDev/VPK_API
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 #include <l4d2_mission>
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.4.1"
+#define PLUGIN_VERSION "0.4.2"
 
 #define MISSIONS_PATH_WORKSHOP "addons/workshop" // If vpk in addons/workshop directory
 #define MISSIONS_PATH "addons"
@@ -217,9 +217,11 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 		if (StrContains(temp, "missions/") > -1)
 		{
 			LogMessage("Find mission=[%s], length=[%d]", temp, entryLength);
+			// Create a new file handle to avoid position reset problem
 			File fRead = OpenFile(filePath, "rb");
 			fRead.Seek(fileVpk.Position, SEEK_SET);
 			File fWrite = OpenFile(missionFile, "wb+");
+			// Should write preload bytes first
 			if (entryPreloadBytes > 0)
 			{
 				for (int index = 0; index < entryPreloadBytes; index++)
@@ -234,7 +236,8 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 			{
 				if (entryIndex == 0x7fff)
 				{
-					// Maybe cause timeout if entry is a large file, but no problem here for mission txt
+					// May cause timeout if entry is a large file, but i guess no problem here for mission txt
+					// You can deal with large file like what SilverShot do [https://github.com/SilvDev/VPK_API]
 					int offset = entryOffset + headerSize + treeSize;
 					fRead.Seek(offset, SEEK_SET);
 					for (int index = 0; index < entryLength; index++)
@@ -246,9 +249,9 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 				} 
 				else
 				{
-					// Just extract .txt file from mission folder, we dont care about others like .vpk
+					// Maybe some internal vpk here, but who cares
+					// Just extract .txt file from mission folder, so no need to do anything here
 				}
-				
 			}
 			fWrite.Flush();
 			delete fRead;
