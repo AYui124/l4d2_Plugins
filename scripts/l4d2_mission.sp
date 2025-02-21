@@ -23,7 +23,7 @@
 #include <l4d2_mission>
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.3"
+#define PLUGIN_VERSION "0.4"
 
 #define MISSIONS_PATH_WORKSHOP "addons/workshop" // If vpk in addons/workshop directory
 #define MISSIONS_PATH "addons"
@@ -61,6 +61,7 @@ int Native_GetMissionFirstMapCode(Handle plugin, int numParams)
 	BuildPath(Path_SM, missionFile, sizeof(missionFile), "data/%s.txt", filename);
 	if (FileExists(missionFile))
 	{
+		LogMessage("[%s] file exists, skip vpk extraction!", missionFile);
 	} 
 	else
 	{
@@ -71,12 +72,32 @@ int Native_GetMissionFirstMapCode(Handle plugin, int numParams)
 			return -1;
 		}
 	}
-
-	SetNativeString(2, "todo", PLATFORM_MAX_PATH);
-	SetNativeString(3, "", PLATFORM_MAX_PATH);
-	return 0;
+	char code[PLATFORM_MAX_PATH];
+	if (GetFirstMapFromMissionTxt(missionFile, code))
+	{
+		SetNativeString(2, code, PLATFORM_MAX_PATH);
+		SetNativeString(3, "", PLATFORM_MAX_PATH);
+		return 0;
+	}
+	DeleteFile(missionFile);
+	SetNativeString(2, "", PLATFORM_MAX_PATH);
+	SetNativeString(3, "mission txt error!", PLATFORM_MAX_PATH);
+	return -1;
 }
 
+bool GetFirstMapFromMissionTxt(const char missionTxt[PLATFORM_MAX_PATH], char code[PLATFORM_MAX_PATH])
+{
+	new Handle:missions = CreateKeyValues("mission");
+	FileToKeyValues(missions, missionTxt);
+	KvJumpToKey(missions, "modes", false);
+	if (KvJumpToKey(missions, "coop", false))
+	{
+		KvGotoFirstSubKey(missions);
+		KvGetString(missions, "map", code, sizeof(code));
+	}
+	CloseHandle(missions);
+	return strlen(code) > 0;
+}
 
 int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFile[PLATFORM_MAX_PATH], char msg[PLATFORM_MAX_PATH] = "")
 {
@@ -94,18 +115,22 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 		return -1;
 	}
 	int version;
-	int size;
+	int treeSize;
 
 	fileVpk.Seek(4, SEEK_SET); // 4 bytes for signature, we don't care about it
 	ReadFileCell(fileVpk, version, 4);
-	ReadFileCell(fileVpk, size, 4);
+	ReadFileCell(fileVpk, treeSize, 4);
+	#if DebugVpkInfo
+		LogMessage("vpk treeSize=[%d], version=[%d]", treeSize, version);
+	#endif
     /*
 	* Why 12 and 28?
 	* version_1 header length is 12 bytes: signature + version + size
 	* version_2 header length is 28 bytes: 12 for version_1 and 16 for other info
 	*/
-	fileVpk.Seek(version == 1 ? 12 : 28, SEEK_SET); // Go to entry data 
-
+	int headerSize = version == 1 ? 12 : 28;
+	fileVpk.Seek(headerSize, SEEK_SET); // Go to entry data 
+	
 	// Some variables
 	char temp[PLATFORM_MAX_PATH];
 	char file[PLATFORM_MAX_PATH];
@@ -179,12 +204,12 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 
 		Format(temp, sizeof(temp), "%s%s%s", lastDir, file, lastExt);
 		#if DebugVpkInfo
-			LogMessage("new file=[%s]", temp);
+			LogMessage("new file=[%s] info:entryIndex=%d,entryPreloadBytes=%d,entryOffset=%d,entryLength=%d", temp, entryIndex, entryPreloadBytes, entryOffset, entryLength);
 		#endif
 		// We only need to get txt in missions directory
 		if (StrContains(temp, "missions/") > -1)
 		{
-			LogMessage("Find mission=[%s],%d-%d-%d", temp, entryPreloadBytes, entryOffset, entryLength);
+			LogMessage("Find mission=[%s], length=[%d]", temp, entryLength);
 			File fRead = OpenFile(filePath, "rb");
 			fRead.Seek(fileVpk.Position, SEEK_SET);
 			File fWrite = OpenFile(missionFile, "wb+");
@@ -200,13 +225,23 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 			
 			if (entryLength > 0)
 			{
-				fRead.Seek(entryOffset + entryPreloadBytes, SEEK_SET);
-				for (int index = 0; index < entryLength; index++)
+				if (entryIndex == 0x7fff)
 				{
-					int copyByte;
-					ReadFileCell(fRead, copyByte, 1);
-					WriteFileCell(fWrite, copyByte, 1);
+					// Maybe cause timeout if entry is a large file, but no problem here for mission txt
+					int offset = entryOffset + headerSize + treeSize;
+					fRead.Seek(offset, SEEK_SET);
+					for (int index = 0; index < entryLength; index++)
+					{
+						int copyByte;
+						ReadFileCell(fRead, copyByte, 1);
+						WriteFileCell(fWrite, copyByte, 1);
+					}
+				} 
+				else
+				{
+					// Just extract .txt file from mission folder, we dont care about others like .vpk
 				}
+				
 			}
 			fWrite.Flush();
 			delete fRead;
@@ -221,7 +256,7 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 		newSegment = false;
 		NewSegmentByteCheck(fileVpk, byteCheck, newSegment);
 	}
-	while (fileVpk.Position < size);
+	while (fileVpk.Position < treeSize);
 
 	delete fileVpk;
 	return 0;
