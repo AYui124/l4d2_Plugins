@@ -18,19 +18,20 @@
 *	along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 #pragma semicolon 1
+#pragma newdecls required
 
 #include <sourcemod>
 #include <l4d2_mission>
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.4"
+#define PLUGIN_VERSION "0.4.1"
 
 #define MISSIONS_PATH_WORKSHOP "addons/workshop" // If vpk in addons/workshop directory
 #define MISSIONS_PATH "addons"
 
 #define DebugVpkInfo false
 
-public Plugin:myinfo = 
+public Plugin myinfo = 
 {
 	name = "[l4d2] mission",
 	author = PLUGIN_AUTHOR,
@@ -58,7 +59,12 @@ int Native_GetMissionFirstMapCode(Handle plugin, int numParams)
 	GetNativeString(1, filename, sizeof(filename));
 	char msg[PLATFORM_MAX_PATH];
 	char missionFile[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, missionFile, sizeof(missionFile), "data/%s.txt", filename);
+	BuildPath(Path_SM, missionFile, sizeof(missionFile), "data/missions");
+	if (!DirExists(missionFile))
+	{
+		CreateDirectory(missionFile, 511);
+	}
+	BuildPath(Path_SM, missionFile, sizeof(missionFile), "data/missions/%s.txt", filename);
 	if (FileExists(missionFile))
 	{
 		LogMessage("[%s] file exists, skip vpk extraction!", missionFile);
@@ -79,7 +85,6 @@ int Native_GetMissionFirstMapCode(Handle plugin, int numParams)
 		SetNativeString(3, "", PLATFORM_MAX_PATH);
 		return 0;
 	}
-	DeleteFile(missionFile);
 	SetNativeString(2, "", PLATFORM_MAX_PATH);
 	SetNativeString(3, "mission txt error!", PLATFORM_MAX_PATH);
 	return -1;
@@ -87,18 +92,21 @@ int Native_GetMissionFirstMapCode(Handle plugin, int numParams)
 
 bool GetFirstMapFromMissionTxt(const char missionTxt[PLATFORM_MAX_PATH], char code[PLATFORM_MAX_PATH])
 {
-	new Handle:missions = CreateKeyValues("mission");
+	Handle missions = CreateKeyValues("mission");
 	FileToKeyValues(missions, missionTxt);
 	KvJumpToKey(missions, "modes", false);
 	if (KvJumpToKey(missions, "coop", false))
 	{
 		KvGotoFirstSubKey(missions);
 		KvGetString(missions, "map", code, sizeof(code));
+		CloseHandle(missions);
+		return true;
 	}
 	CloseHandle(missions);
-	return strlen(code) > 0;
+	return false;
 }
 
+// Modify from ReadVpk() in https://github.com/SilvDev/VPK_API
 int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFile[PLATFORM_MAX_PATH], char msg[PLATFORM_MAX_PATH] = "")
 {
 	char filePath[PLATFORM_MAX_PATH];
@@ -116,7 +124,6 @@ int GetMissionTxtFromVpk(const char filename[PLATFORM_MAX_PATH], char missionFil
 	}
 	int version;
 	int treeSize;
-
 	fileVpk.Seek(4, SEEK_SET); // 4 bytes for signature, we don't care about it
 	ReadFileCell(fileVpk, version, 4);
 	ReadFileCell(fileVpk, treeSize, 4);
