@@ -29,6 +29,8 @@
 #endif
 #define _l4d2_mission_included
 
+#include <sourcemod>
+
 public SharedPlugin __pl_l4d2_mission = 
 {
 	name = "l4d2_mission",
@@ -43,7 +45,8 @@ public SharedPlugin __pl_l4d2_mission =
 #if !defined REQUIRE_PLUGIN
 public void __pl_l4d2_mission_SetNTVOptional()
 {
-	MarkNativeAsOptional("LM_GetMissionFirstMapCode");
+	MarkNativeAsOptional("LM_GetMissionCoopMapCodes");
+	MarkNativeAsOptional("LM_GetMissions");
 }
 #endif
 
@@ -51,9 +54,16 @@ public void __pl_l4d2_mission_SetNTVOptional()
  * @brief Get misson code from the specified VPK file
  *
  * @param filename		The name of the VPK to open (e.g. "example" for "example.vpk")
- * @param mapCode		Return the code of the first coop mission of the VPK
- * @param msg			Return msg if failed
+ * @param codes			Return the codes of the coop maps of the VPK
  *
  * @return				0 on success, -1 on failed
  */
-native int LM_GetMissionFirstMapCode(const char filename[PLATFORM_MAX_PATH],  char mapCode[256], char msg[256]);
+native int LM_GetMissionCoopMapCodes(const char filename[PLATFORM_MAX_PATH],  ArrayList codes);
+
+/**
+ * @brief Get all loaded missions
+ *
+ * @param codes			Return the codes of the coop maps of the VPK
+ * @return				0 on success, -1 on failed
+ */
+native int LM_GetMissions(ArrayList codes);

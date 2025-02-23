@@ -25,7 +25,7 @@
 #define DEBUG true
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.4"
+#define PLUGIN_VERSION "0.5"
 
 
 public Plugin myinfo = 
@@ -39,47 +39,62 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	RegConsoleCmd("sm_lm", Command_ShowMap, "输入vpk名获取地图代码 (eg: sm_lm 地图-伦理问题)");
+	RegConsoleCmd("sm_lm", Command_ShowMap, "Show Maps");
 }
-
 
 public Action Command_ShowMap(int client, int args)
 {
-	char path[PLATFORM_MAX_PATH];
-	for(int i = 1; i <= args; i++)
+	ArrayList missionList = new ArrayList(PLATFORM_MAX_PATH, 0);
+	LM_GetMissions(missionList);
+	Menu menu = CreateMenu(MapMenuHandler);
+	for (int i = 0; i < missionList.Length; i++)
 	{
-		char arg[PLATFORM_MAX_PATH];
-		GetCmdArg(i, arg, sizeof(arg));
-		if (i == 1)
-		{
-			FormatEx(path, sizeof(path), "%s", arg);
-		}
-		else
-		{
-			FormatEx(path, sizeof(path), "%s %s", path, arg);
-		}
+		char mission[PLATFORM_MAX_PATH];
+		missionList.GetString(i, mission, sizeof(mission));
+		LogMessage("%d: %s", i+1, mission);
+		char display[PLATFORM_MAX_PATH];
+		FormatEx(display, PLATFORM_MAX_PATH, "%s", mission);
+		ReplaceString(display, sizeof(display), ".vpk", "");
+		AddMenuItem(menu, mission, display);
 	}
-
-	char missionCode[PLATFORM_MAX_PATH];
-	char msg[PLATFORM_MAX_PATH];
-	if (LM_GetMissionFirstMapCode(path, missionCode, msg) == 0)
-	{
-		if (client > 0 && client < MaxClients)
-		{
-			PrintToChat(client, "首章地图代码: %s", missionCode);
-		}
-		LogMessage("Mission code: %s", missionCode);
-	} 
-	else
-	{
-		if (client > 0 && client < MaxClients)
-		{
-			PrintToChat(client, "无法获取地图代码: %s", msg);
-		}
-		LogMessage("Failed To get mission code: %s", msg);
-	}
-	
+	SetMenuExitButton(menu, true);
+	DisplayMenu(menu, client, MENU_TIME_FOREVER);
 	return Plugin_Handled;
 }
 
+public int MapMenuHandler(Menu menu, MenuAction action, int client, int itemNum)
+{
+	if (action == MenuAction_Select) 
+	{
+		char info[PLATFORM_MAX_PATH];
+		char display[PLATFORM_MAX_PATH];
+		menu.GetItem(itemNum, info, sizeof(info), _, display, sizeof(display));
+		
+		LogMessage("%N 选择: [%d] 项 info:[%s],display:[%s]", client, itemNum, info, display);
 
+		ArrayList missionCodes = new ArrayList(PLATFORM_MAX_PATH, 0);
+		char buffer[2048];
+		if (LM_GetMissionCoopMapCodes(info, missionCodes) == 0)
+		{
+			if (client > 0 && client < MaxClients)
+			{
+				for (int i = 0; i < missionCodes.Length; i++)
+				{
+					char missionCode[PLATFORM_MAX_PATH];
+					missionCodes.GetString(i, missionCode, sizeof(missionCode));
+					Format(buffer, sizeof(buffer), "%s\n第%i章节: %s", buffer, i+1, missionCode);
+					
+				}
+				PrintToChat(client, "%s 地图代码: %s", display, buffer);
+			}
+		} 
+		else
+		{
+			if (client > 0 && client < MaxClients)
+			{
+				PrintToChat(client, "无法获取地图代码");
+			}
+		}
+	}
+	return 0;
+}
