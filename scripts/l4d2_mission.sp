@@ -91,8 +91,11 @@ public Action InitMissions(Handle timer, any data)
 			LogMessage("[%s] vpk extraction failed", filename);
 			continue;
 		}
-		//ReplaceString(filename, sizeof(filename), ".vpk", "");
-		missionList.PushString(filename);
+		if (FileExists(missionFile))
+		{
+			//ReplaceString(filename, sizeof(filename), ".vpk", "");
+			missionList.PushString(filename);
+		}
 	}
 	paths.Close();
 	return Plugin_Handled;
