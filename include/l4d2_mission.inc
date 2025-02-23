@@ -53,17 +53,17 @@ public void __pl_l4d2_mission_SetNTVOptional()
 /**
  * @brief Get misson code from the specified VPK file
  *
- * @param filename		The name of the VPK to open (e.g. "example" for "example.vpk")
- * @param codes			Return the codes of the coop maps of the VPK
+ * @param filename		The name of the VPK to open (e.g. "example.vpk")
+ * @param codes			Return the map codes of the coop mode in the VPK
  *
  * @return				0 on success, -1 on failed
  */
 native int LM_GetMissionCoopMapCodes(const char filename[PLATFORM_MAX_PATH],  ArrayList codes);
 
 /**
- * @brief Get all loaded missions
+ * @brief Get all loaded missions by traversing addons directory
  *
- * @param codes			Return the codes of the coop maps of the VPK
+ * @param maps			Return the names of VPKs which has mission txt
  * @return				0 on success, -1 on failed
  */
-native int LM_GetMissions(ArrayList codes);
+native int LM_GetMissions(ArrayList maps);
