@@ -24,17 +24,18 @@
 #include <l4d2_mission>
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.5.1"
+#define PLUGIN_VERSION "0.6.5"
 
 #define MISSIONS_PATH_WORKSHOP "addons/workshop" // If vpk in addons/workshop directory
 #define MISSIONS_PATH "addons"
-#define	MAX_EXTRATION_TIME 0.3
+#define	MAX_EXTRACTION_TIME 0.3
+#define	LOG_VPK_EXTRACTION_DETAILS false
 
 ArrayList missionList;
 
 public Plugin myinfo = 
 {
-	name = "[l4d2] mission",
+	name = "l4d2_mission",
 	author = PLUGIN_AUTHOR,
 	description = "Get map codes in coop mode from vpk",
 	version = PLUGIN_VERSION,
@@ -54,16 +55,20 @@ public void OnPluginStart()
 {
 	missionList = new ArrayList(PLATFORM_MAX_PATH);
 	CreateConVar("l4d2_mission_version", PLUGIN_VERSION, "l4d2_mission plugin version.");
-	CreateTimer(2.0, InitMissions, _, TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(0.5, InitMissions, 0, 0);// Important: must not use TIMER_FLAG_NO_MAPCHANGE !!
 }
 
-
-public Action InitMissions(Handle timer, any data)
+public Action InitMissions(Handle timer, int data)
 {
+	#if LOG_VPK_EXTRACTION_DETAILS
+		LogMessage("InitMissions...");
+	#endif
 	ArrayList paths = new ArrayList(PLATFORM_MAX_PATH, 0);
 	FindVpks(paths, MISSIONS_PATH);
 	FindVpks(paths, MISSIONS_PATH_WORKSHOP);
-
+	#if LOG_VPK_EXTRACTION_DETAILS
+		LogMessage("InitMissions find %d vpk files", paths.Length / 2);
+	#endif
 	char missionPath[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, missionPath, sizeof(missionPath), "data/missions");
 	if (!DirExists(missionPath))
@@ -81,106 +86,41 @@ public Action InitMissions(Handle timer, any data)
 		BuildPath(Path_SM, missionFile, sizeof(missionFile), "data/missions/%s.txt", filename);
 		if (FileExists(missionFile))
 		{
-			LogMessage("[%s] mission txt existed", filename);
-			//ReplaceString(filename, sizeof(filename), ".vpk", "");
+			#if LOG_VPK_EXTRACTION_DETAILS
+				LogMessage("[%s] mission txt existed", filename);
+			#endif
 			missionList.PushString(filename);
 			continue;
 		}
-		if (GetMissionTxtFromVpk(filePath, missionFile) < 0)
-		{
-			LogMessage("[%s] vpk extraction failed", filename);
-			continue;
-		}
-		if (FileExists(missionFile))
-		{
-			//ReplaceString(filename, sizeof(filename), ".vpk", "");
-			missionList.PushString(filename);
-		}
+		GetMissionTxtFromVpk(filePath, filename, missionFile);
 	}
 	paths.Close();
-	return Plugin_Handled;
+	return Plugin_Continue;
 }
 
-int Native_GetMissionCoopMapCode(Handle plugin, int numParams)
-{
-	char filename[PLATFORM_MAX_PATH];
-	GetNativeString(1, filename, sizeof(filename));
-	char missionFile[PLATFORM_MAX_PATH];
-	if (StrContains(filename, ".vpk") < 1)
-	{
-		LogMessage("The filename [%s] is invalid! should end with .vpk", filename);
-		return -1;
-	}
-	BuildPath(Path_SM, missionFile, sizeof(missionFile), "data/missions/%s.txt", filename);
-	if (!FileExists(missionFile))
-	{
-		LogMessage("The mission file [%s] is missed", missionFile);
-		return -1;
-	} 
-	ArrayList codes = GetNativeCell(2);
-	if (GetCoopModesFromMissionTxt(missionFile, codes))
-	{
-		return 0;
-	}
-	return -1;
-}
-
-int Native_GetMissions(Handle plugin, int numParams)
-{	
-	ArrayList list = GetNativeCell(1);
-	for (int i = 0; i < missionList.Length; i++)
-	{
-		char buffer[PLATFORM_MAX_PATH];
-		missionList.GetString(i, buffer, PLATFORM_MAX_PATH);
-		if (strlen(buffer) > 1)
-		{
-			list.PushString(buffer);
-		}
-	}
-	return 0;
-}
-
-bool GetCoopModesFromMissionTxt(const char missionTxt[PLATFORM_MAX_PATH], ArrayList codes)
-{
-	Handle missions = CreateKeyValues("mission");
-	FileToKeyValues(missions, missionTxt);
-	KvJumpToKey(missions, "modes", false);
-	if (KvJumpToKey(missions, "coop", false))
-	{
-		KvGotoFirstSubKey(missions); // first map for each txt
-		do
-		{
-			char mapName[PLATFORM_MAX_PATH];
-			KvGetString(missions, "map", mapName, sizeof(mapName));
-			codes.PushString(mapName);
-		}
-		while (KvGotoNextKey(missions));
-	}
-	CloseHandle(missions);
-	return true;
-}
 
 // Modify from ReadVpk() in https://github.com/SilvDev/VPK_API
-int GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], char missionFile[PLATFORM_MAX_PATH])
+void GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], const char filename[PLATFORM_MAX_PATH], char missionFile[PLATFORM_MAX_PATH])
 {
 	File fileVpk = OpenFile(filePath, "rb");
 	if (fileVpk == null)
 	{
 		LogMessage("Failed to open file %s", filePath);
-		return -1;
+		return;
 	}
 	int version;
 	int treeSize;
 	fileVpk.Seek(4, SEEK_SET); // 4 bytes for signature, we don't care about it
 	ReadFileCell(fileVpk, version, 4);
 	ReadFileCell(fileVpk, treeSize, 4);
+
+	delete fileVpk;
     /*
 	* Why 12 and 28?
 	* version_1 header length is 12 bytes: signature + version + size
 	* version_2 header length is 28 bytes: 12 for version_1 and 16 for other info
 	*/
 	int headerSize = version == 1 ? 12 : 28;
-	fileVpk.Seek(headerSize, SEEK_SET); // Go to entry data 
 	
 	// Some variables
 	char temp[PLATFORM_MAX_PATH];
@@ -189,16 +129,82 @@ int GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], char missionFil
 	char lastExt[PLATFORM_MAX_PATH];
 	bool newSegment = true;
 	int byteCheck;
+	// use timer to avoid timeout
+	DataPack pack = new DataPack();
+	pack.WriteCell(headerSize);
+	pack.WriteCell(treeSize);
+	pack.WriteCell(headerSize);
+	pack.WriteString(filePath);
+	pack.WriteString(filename);
+	pack.WriteString(missionFile);
+	pack.WriteString(temp);
+	pack.WriteString(file);
+	pack.WriteString(lastDir);
+	pack.WriteString(lastExt);
+	pack.WriteCell(newSegment);
+	pack.WriteCell(byteCheck);
+	
+	CreateTimer(0.1, ReadVpkCatalogue, pack, 0); 
+}
 
-	// VPKEntry variables 
-	int entryHash;
-	int entryPreloadBytes;
-	int entryIndex;
-	int entryOffset;
-	int entryLength;
-	int entryTerminator;
+public Action ReadVpkCatalogue(Handle timer, DataPack pack)
+{
+	float start = GetEngineTime();
+	pack.Reset();
+
+	char filePath[PLATFORM_MAX_PATH];
+	char filename[PLATFORM_MAX_PATH];
+	char missionFile[PLATFORM_MAX_PATH];
+
+	char temp[PLATFORM_MAX_PATH];
+	char file[PLATFORM_MAX_PATH];
+	char lastDir[PLATFORM_MAX_PATH];
+	char lastExt[PLATFORM_MAX_PATH];
+	bool newSegment;
+	int byteCheck;
+
+	int headerSize = pack.ReadCell();
+	int treeSize = pack.ReadCell();
+	int position = pack.ReadCell();
+	
+	pack.ReadString(filePath, sizeof(filePath));
+	pack.ReadString(filename, sizeof(filename));
+	pack.ReadString(missionFile, sizeof(missionFile));
+	#if LOG_VPK_EXTRACTION_DETAILS
+		LogMessage("ReadVpk: [%s], position=%d", filePath, position);
+	#endif
+	pack.ReadString(temp, sizeof(temp));
+	pack.ReadString(file, sizeof(file));
+	pack.ReadString(lastDir, sizeof(lastDir));
+	pack.ReadString(lastExt, sizeof(lastExt));
+	newSegment = view_as<bool>(pack.ReadCell());
+	byteCheck = pack.ReadCell();
+
+	File fileVpk = OpenFile(filePath, "rb");
+	fileVpk.Seek(position, SEEK_SET);
 	do
 	{
+		// Start new process if reached timeout
+		if(GetEngineTime() - start > MAX_EXTRACTION_TIME)
+		{
+			pack.Reset(true);
+			pack.WriteCell(headerSize);
+			pack.WriteCell(treeSize);
+			pack.WriteCell(fileVpk.Position);
+			pack.WriteString(filePath);
+			pack.WriteString(filename);
+			pack.WriteString(missionFile);
+			pack.WriteString(temp);
+			pack.WriteString(file);
+			pack.WriteString(lastDir);
+			pack.WriteString(lastExt);
+			pack.WriteCell(newSegment);
+			pack.WriteCell(byteCheck);
+			CreateTimer(0.1, ReadVpkCatalogue, pack, 0);
+			delete fileVpk;
+			return Plugin_Continue;
+		}
+
 		if (newSegment)
 		{
 			if (byteCheck == 0)
@@ -215,6 +221,9 @@ int GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], char missionFil
 					{
 						FormatEx(lastExt, sizeof(lastExt), ".%s", temp);
 					}
+					#if LOG_VPK_EXTRACTION_DETAILS
+						LogMessage("New ext: [%s]", lastExt);
+					#endif
 				}
 			}
 			fileVpk.ReadString(temp, sizeof(temp));
@@ -229,6 +238,9 @@ int GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], char missionFil
 				{
 					StrCat(lastDir, sizeof(lastDir), "/");
 				}
+				#if LOG_VPK_EXTRACTION_DETAILS
+					LogMessage("New dir: [%s]", lastDir);
+				#endif
 			}
 		}
 
@@ -240,6 +252,12 @@ int GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], char missionFil
 			continue;
 		}
 		// 18 bytes per file data section
+		int entryHash;
+		int entryPreloadBytes;
+		int entryIndex;
+		int entryOffset;
+		int entryLength;
+		int entryTerminator;
 		ReadFileCell(fileVpk, entryHash, 4);
 		ReadFileCell(fileVpk, entryPreloadBytes, 2);
 		ReadFileCell(fileVpk, entryIndex, 2);
@@ -248,10 +266,15 @@ int GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], char missionFil
 		ReadFileCell(fileVpk, entryTerminator, 2);
 
 		Format(temp, sizeof(temp), "%s%s%s", lastDir, file, lastExt);
+		#if LOG_VPK_EXTRACTION_DETAILS
+			LogMessage("New file: [%s], %d-%d", temp, entryOffset, entryLength);
+		#endif
 		// We only need to get txt in missions directory
 		if (StrContains(temp, "missions/") == 0 && StrContains(temp, "addoninfo.txt") < 0 && StrContains(temp, ".txt") > 1)
 		{
-			LogMessage("Find mission=[%s], length=[%d]", temp, entryLength);
+			#if LOG_VPK_EXTRACTION_DETAILS
+				LogMessage("Find mission=[%s], length=[%d]", temp, entryLength);
+			#endif
 			// Create a new file handle to avoid position reset problem
 			File fRead = OpenFile(filePath, "rb");
 			fRead.Seek(fileVpk.Position, SEEK_SET);
@@ -266,31 +289,31 @@ int GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], char missionFil
 					WriteFileCell(fWrite, copyByte, 1);
 				}
 			}
-			
+			fWrite.Flush();
+			delete fRead;
+			delete fWrite;
+
 			if (entryLength > 0)
 			{
 				if (entryIndex == 0x7fff)
 				{
-					// May cause timeout if entry is a large file, but i guess no problem here for mission txt
-					// You can deal with large file like what SilverShot do [https://github.com/SilvDev/VPK_API]
+					#if LOG_VPK_EXTRACTION_DETAILS
+						LogMessage("Start Timer to extract: %s", temp);
+					#endif
 					int offset = entryOffset + headerSize + treeSize;
-					fRead.Seek(offset, SEEK_SET);
-					for (int index = 0; index < entryLength; index++)
-					{
-						int copyByte;
-						ReadFileCell(fRead, copyByte, 1);
-						WriteFileCell(fWrite, copyByte, 1);
-					}
+					DataPack newPack = new DataPack();
+					newPack.WriteCell(offset);
+					newPack.WriteCell(entryLength);
+					newPack.WriteString(filePath);
+					newPack.WriteString(missionFile);
+					newPack.WriteString(filename);
+					CreateTimer(0.1, ExtractFile, newPack, 0);
 				} 
 				else
 				{
-					// Maybe some internal vpk here, but who cares
-					// Just extract .txt file from mission folder, so no need to do anything here
+					// Maybe some internal vpk here, but who cares?
 				}
 			}
-			fWrite.Flush();
-			delete fRead;
-			delete fWrite;
 		}
 
 		if (entryPreloadBytes)
@@ -302,9 +325,61 @@ int GetMissionTxtFromVpk(const char filePath[PLATFORM_MAX_PATH], char missionFil
 		NewSegmentByteCheck(fileVpk, byteCheck, newSegment);
 	}
 	while (fileVpk.Position < treeSize);
-
+	pack.Close();
 	delete fileVpk;
-	return 0;
+	#if LOG_VPK_EXTRACTION_DETAILS
+		LogMessage("Reading Vpk finished: %s", filePath);
+	#endif
+	return Plugin_Continue;
+}
+
+public Action ExtractFile(Handle timer, DataPack pack)
+{
+	float start = GetEngineTime();
+
+	char filePath[PLATFORM_MAX_PATH];
+	char missionFile[PLATFORM_MAX_PATH];
+	char filename[PLATFORM_MAX_PATH];
+	pack.Reset();
+	int offset = pack.ReadCell();
+	int entryLength = pack.ReadCell();
+	pack.ReadString(filePath, sizeof(filePath));
+	pack.ReadString(missionFile, sizeof(missionFile));
+	pack.ReadString(filename, sizeof(filename));
+	#if LOG_VPK_EXTRACTION_DETAILS
+		LogMessage("ExtractFile: [%s], offset:%d,length:%d", missionFile, offset, entryLength);
+	#endif
+	File fRead = OpenFile(filePath, "rb");
+	File fWrite = OpenFile(missionFile, "ab+");
+
+	fRead.Seek(offset, SEEK_SET);
+	for (int index = 0; index < entryLength; index++)
+	{
+		// Start new process if reached timeout
+		if(GetEngineTime() - start > MAX_EXTRACTION_TIME)
+		{
+			fWrite.Flush();
+			delete fRead;
+			delete fWrite;
+			pack.Reset(true);
+			pack.WriteCell(offset + index);
+			pack.WriteCell(entryLength - index);
+			pack.WriteString(filePath);
+			pack.WriteString(missionFile);
+			pack.WriteString(filename);
+			CreateTimer(0.1, ExtractFile, pack, TIMER_FLAG_NO_MAPCHANGE);
+			return Plugin_Continue;
+		}
+		int copyByte;
+		ReadFileCell(fRead, copyByte, 1);
+		WriteFileCell(fWrite, copyByte, 1);
+	}
+	pack.Close();
+	fWrite.Flush();
+	delete fRead;
+	delete fWrite;
+	missionList.PushString(filename);
+	return Plugin_Continue;
 }
 
 void NewSegmentByteCheck(File fileVpk, int &byteCheck, bool &newSegment)
@@ -345,6 +420,9 @@ bool FindVpks(ArrayList paths, char path[PLATFORM_MAX_PATH])
 			{
 				continue;
 			}
+			#if LOG_VPK_EXTRACTION_DETAILS
+				LogMessage("FindVpks find: [%s]", file);
+			#endif
 			paths.PushString(temp);
 			paths.PushString(file);
 		}
@@ -352,3 +430,61 @@ bool FindVpks(ArrayList paths, char path[PLATFORM_MAX_PATH])
 	return true;
 }
 
+int Native_GetMissionCoopMapCode(Handle plugin, int numParams)
+{
+	char filename[PLATFORM_MAX_PATH];
+	GetNativeString(1, filename, sizeof(filename));
+	char missionFile[PLATFORM_MAX_PATH];
+	if (StrContains(filename, ".vpk") < 1)
+	{
+		LogMessage("The filename [%s] is invalid! should end with .vpk", filename);
+		return -1;
+	}
+	BuildPath(Path_SM, missionFile, sizeof(missionFile), "data/missions/%s.txt", filename);
+	if (!FileExists(missionFile))
+	{
+		LogMessage("The mission file [%s] is missed", missionFile);
+		return -1;
+	} 
+	ArrayList codes = GetNativeCell(2);
+	if (GetCoopModesFromMissionTxt(missionFile, codes))
+	{
+		return 0;
+	}
+	return -1;
+}
+
+bool GetCoopModesFromMissionTxt(const char missionTxt[PLATFORM_MAX_PATH], ArrayList codes)
+{
+	Handle missions = CreateKeyValues("mission");
+	FileToKeyValues(missions, missionTxt);
+	KvJumpToKey(missions, "modes", false);
+	if (KvJumpToKey(missions, "coop", false))
+	{
+		KvGotoFirstSubKey(missions); // first map for each txt
+		do
+		{
+			char mapName[PLATFORM_MAX_PATH];
+			KvGetString(missions, "map", mapName, sizeof(mapName));
+			codes.PushString(mapName);
+		}
+		while (KvGotoNextKey(missions));
+	}
+	CloseHandle(missions);
+	return true;
+}
+
+int Native_GetMissions(Handle plugin, int numParams)
+{	
+	ArrayList list = GetNativeCell(1);
+	for (int i = 0; i < missionList.Length; i++)
+	{
+		char buffer[PLATFORM_MAX_PATH];
+		missionList.GetString(i, buffer, PLATFORM_MAX_PATH);
+		if (strlen(buffer) > 1)
+		{
+			list.PushString(buffer);
+		}
+	}
+	return 0;
+}

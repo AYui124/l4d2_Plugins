@@ -25,12 +25,11 @@
 #define DEBUG true
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.5"
-
+#define PLUGIN_VERSION "0.6.1"
 
 public Plugin myinfo = 
 {
-	name = "[l4d2] mission command",
+	name = "l4d2_missioncmd",
 	author = PLUGIN_AUTHOR,
 	description = "mission map code",
 	version = PLUGIN_VERSION,
@@ -39,6 +38,7 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
+	CreateConVar("l4d2_missioncmd_version", PLUGIN_VERSION, "l4d2_missioncmd plugin version.");
 	RegConsoleCmd("sm_lm", Command_ShowMap, "Show Maps");
 }
 
@@ -46,6 +46,15 @@ public Action Command_ShowMap(int client, int args)
 {
 	ArrayList missionList = new ArrayList(PLATFORM_MAX_PATH, 0);
 	LM_GetMissions(missionList);
+	if (missionList.Length < 1)
+	{
+		LogMessage("无法获取地图数据或没有三方图");
+		if (client > 0 && client < MaxClients)
+		{
+			PrintToChat(client, "无法获取地图数据或没有三方图");
+			return Plugin_Handled;
+		}
+	}
 	Menu menu = CreateMenu(MapMenuHandler);
 	for (int i = 0; i < missionList.Length; i++)
 	{
@@ -83,7 +92,6 @@ public int MapMenuHandler(Menu menu, MenuAction action, int client, int itemNum)
 					char missionCode[PLATFORM_MAX_PATH];
 					missionCodes.GetString(i, missionCode, sizeof(missionCode));
 					Format(buffer, sizeof(buffer), "%s\n第%i章节: %s", buffer, i+1, missionCode);
-					
 				}
 				PrintToChat(client, "%s 地图代码: %s", display, buffer);
 			}
