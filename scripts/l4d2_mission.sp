@@ -24,7 +24,7 @@
 #include <l4d2_mission>
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.6.5"
+#define PLUGIN_VERSION "0.6.7"
 
 #define MISSIONS_PATH_WORKSHOP "addons/workshop" // If vpk in addons/workshop directory
 #define MISSIONS_PATH "addons"
@@ -32,6 +32,7 @@
 #define	LOG_VPK_EXTRACTION_DETAILS false
 
 ArrayList missionList;
+bool inited;
 
 public Plugin myinfo = 
 {
@@ -53,13 +54,31 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
+	inited = false;
 	missionList = new ArrayList(PLATFORM_MAX_PATH);
 	CreateConVar("l4d2_mission_version", PLUGIN_VERSION, "l4d2_mission plugin version.");
-	CreateTimer(0.5, InitMissions, 0, 0);// Important: must not use TIMER_FLAG_NO_MAPCHANGE !!
+
+	HookEvent("round_start", Event_RoundStart);
+}
+
+public void OnMapStart()
+{
+	
+}
+
+public Action Event_RoundStart(Handle event, const char[] event_name, bool dontBroadcast)
+{
+	CreateTimer(0.1, InitMissions, _, TIMER_FLAG_NO_MAPCHANGE);
+	return Plugin_Continue;
 }
 
 public Action InitMissions(Handle timer, int data)
 {
+	if (inited)
+	{
+		return Plugin_Continue;
+	}
+	inited = true;
 	#if LOG_VPK_EXTRACTION_DETAILS
 		LogMessage("InitMissions...");
 	#endif
@@ -330,6 +349,7 @@ public Action ReadVpkCatalogue(Handle timer, DataPack pack)
 	#if LOG_VPK_EXTRACTION_DETAILS
 		LogMessage("Reading Vpk finished: %s", filePath);
 	#endif
+	LogMessage("InitMissions success");
 	return Plugin_Continue;
 }
 
