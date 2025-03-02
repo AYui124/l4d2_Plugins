@@ -24,7 +24,7 @@
 #include <l4d2_mission>
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.6.7"
+#define PLUGIN_VERSION "0.6.8"
 
 #define MISSIONS_PATH_WORKSHOP "addons/workshop" // If vpk in addons/workshop directory
 #define MISSIONS_PATH "addons"
@@ -424,6 +424,10 @@ void NewSegmentByteCheck(File fileVpk, int &byteCheck, bool &newSegment)
 bool FindVpks(ArrayList paths, char path[PLATFORM_MAX_PATH])
 {
 	DirectoryListing dir = OpenDirectory(path);
+	if (dir == null)
+	{
+		return false;
+	}
 	char temp[PLATFORM_MAX_PATH];
 	FileType currType;
 	while (dir.GetNext(temp, sizeof(temp), currType))
