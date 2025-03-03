@@ -25,7 +25,7 @@
 #define DEBUG true
 
 #define PLUGIN_AUTHOR "Yui"
-#define PLUGIN_VERSION "0.6.1"
+#define PLUGIN_VERSION "0.6.2"
 
 public Plugin myinfo = 
 {
@@ -66,7 +66,6 @@ public Action Command_ShowMap(int client, int args)
 		ReplaceString(display, sizeof(display), ".vpk", "");
 		AddMenuItem(menu, mission, display);
 	}
-	SetMenuExitButton(menu, true);
 	DisplayMenu(menu, client, MENU_TIME_FOREVER);
 	return Plugin_Handled;
 }
