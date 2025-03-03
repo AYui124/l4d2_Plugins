@@ -29,9 +29,10 @@
 #define MISSIONS_PATH_WORKSHOP "addons/workshop" // If vpk in addons/workshop directory
 #define MISSIONS_PATH "addons"
 #define	MAX_EXTRACTION_TIME 0.3
-#define	LOG_VPK_EXTRACTION_DETAILS false
+#define	LOG_VPK_EXTRACTION_DETAILS true
 
 ArrayList missionList;
+bool inited;
 
 public Plugin myinfo = 
 {
@@ -53,8 +54,20 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
-	missionList = new ArrayList(PLATFORM_MAX_PATH);
 	CreateConVar("l4d2_mission_version", PLUGIN_VERSION, "l4d2_mission plugin version.");
+}
+
+public void OnMapStart()
+{
+	if (inited)
+	{
+		return;
+	}
+	#if LOG_VPK_EXTRACTION_DETAILS
+		LogMessage("OnMapStart First...");
+	#endif
+	inited = true;
+	missionList = new ArrayList(PLATFORM_MAX_PATH);
 	CreateTimer(0.5, InitMissions, 0, 0);// Important: must not use TIMER_FLAG_NO_MAPCHANGE !!
 }
 
